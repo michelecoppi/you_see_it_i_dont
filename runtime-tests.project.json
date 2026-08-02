@@ -1,0 +1,43 @@
+{
+  "name": "Roblox game runtime QA matrix",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared"
+      }
+    },
+    "ServerScriptService": {
+      "Modules": {
+        "$className": "Folder",
+        "RoomGenerator": {
+          "$path": "src/server/RoomGenerator.luau"
+        },
+        "InteractionValidator": {
+          "$path": "src/server/InteractionValidator.luau"
+        },
+        "RoundDebugService": {
+          "$path": "src/server/RoundDebugService.luau"
+        },
+        "TelemetryService": {
+          "$path": "src/server/TelemetryService.luau"
+        }
+      },
+      "RuntimeQAMatrix": {
+        "$path": "runtime-tests/RuntimeQAMatrix.server.luau"
+      }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "RuntimeQAClient": {
+          "$path": "runtime-tests/RuntimeQAClient.client.luau"
+        }
+      }
+    },
+    "Workspace": {
+      "$properties": {
+        "FilteringEnabled": true
+      }
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "Roblox game tests",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared"
+      }
+    },
+    "ServerScriptService": {
+      "ServerModules": {
+        "$className": "Folder",
+        "RoomGenerator": {
+          "$path": "src/server/RoomGenerator.luau"
+        },
+        "InteractionValidator": {
+          "$path": "src/server/InteractionValidator.luau"
+        },
+        "RemoteGuard": {
+          "$path": "src/server/RemoteGuard.luau"
+        }
+      },
+      "Tests": {
+        "$path": "tests"
+      }
+    }
+  }
+}

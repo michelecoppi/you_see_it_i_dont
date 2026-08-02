@@ -1,0 +1,15 @@
+# Project place file
+/Roblox game.rbxlx
+/prototype.rbxlx
+/build.rbxlx
+/tests.rbxlx
+/qa-build.rbxlx
+/geometry-build.rbxlx
+/runtime-tests.rbxlx
+/codex-*.rbxlx
+
+# Roblox Studio lock files
+/*.rbxlx.lock
+/*.rbxl.lock
+
+sourcemap.json
