@@ -31,6 +31,26 @@ ha registrato correttamente `clients=6 cases=10/10 errorProbe=true`.
 - Test d'integrazione deterministico di tutti i preset, due run con lo stesso seed: PASS.
 - Smoke runtime dopo il refactor, 1 client e 10 casi: PASS.
 
+## Livelli di difficolta espliciti
+
+- Livelli versionati: `Easy`, `Normal` (default) e `Hard`.
+- 5.000 seed per preset e livello, 75.000 generazioni pure totali: PASS.
+- Test d'integrazione deterministico: cinque preset per tre livelli, due run con lo stesso seed (`30/30`): PASS.
+- Matrice runtime estesa, 1 client Solo, propagazione difficolta e probe errori (`30/30`): PASS.
+- Matrice runtime estesa, 2 client Seer/Operator alternati (`30/30`, `60/60` ACK): PASS.
+- Matrice runtime estesa, 6 client Seer/Operator alternati (`30/30`, `180/180` ACK): PASS.
+- Totale difficolta: `90/90` casi, `270/270` ACK e probe errori `9/9`.
+
+## Chiusura sicurezza Milestone 1
+
+- Ledger ricevute senza eliminazione degli ID storici: retry immediato, 125 ricevute successive e riconnessione
+  simulata non duplicano Shards o contatori.
+- Accredito persistente eseguito dentro `UpdateAsync`, riconciliando la cronologia salvata prima della concessione.
+- Estrazione rifiutata se il round non e attivo, le stanze non sono complete, il tempo e implausibile o il
+  personaggio non si trova realmente sul pad.
+- Suite Studio aggiornata: `receipts, extraction security, remote guard, interactions, seeds, puzzles and
+  RoomGenerator passed`.
+
 ## Ripetizione post-P0 server-authoritative
 
 La matrice e stata ripetuta dopo l'introduzione di Alternate Vision e console server-authoritative:
@@ -56,3 +76,13 @@ HUD `CONSOLE LOCKED`, senza errori di integrazione.
 
 Il validatore volumetrico copre gate, console, spawn, percorso e parti bloccanti. I playthrough manuali completi,
 R6/R15, gamepad e touch appartengono alla matrice della Milestone 2.
+
+## Estensione Milestone 2 - catalogo a 7 preset
+
+- Aggiunti `MirrorRelay` e `RuneCircuit`, entrambi con Easy/Normal/Hard e contratto puro deterministico.
+- Suite logica: `105.000/105.000` generazioni PASS.
+- Integrazione RoomGenerator: `42/42` casi PASS.
+- Runtime 1 client: `42/42`, `42/42` ACK, error probe valido.
+- Runtime 2 client: `42/42`, `84/84` ACK, error probe valido.
+- Runtime 6 client: `42/42`, `252/252` ACK, error probe valido.
+- Totale runtime M2: `126/126` casi e `378/378` ACK.

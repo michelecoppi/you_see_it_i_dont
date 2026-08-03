@@ -3,12 +3,13 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
+local ReceiptLedger = require(script.Parent:WaitForChild("ReceiptLedger"))
+
 local PlayerDataService = {}
 PlayerDataService.__index = PlayerDataService
 
 local PROFILE_VERSION = 2
 local AUTOSAVE_INTERVAL = 60
-local MAX_STORED_RECEIPTS = 50
 
 local function deepCopy(value)
 	if typeof(value) ~= "table" then
@@ -132,9 +133,15 @@ local function reconcileProfile(config, savedProfile)
 	end
 
 	if typeof(savedProfile.ReceiptOrder) == "table" then
+		local orderedReceipts = {}
 		for _, receiptId in ipairs(savedProfile.ReceiptOrder) do
-			if typeof(receiptId) == "string" and profile.ProcessedReceipts[receiptId] then
+			if
+				typeof(receiptId) == "string"
+				and profile.ProcessedReceipts[receiptId]
+				and not orderedReceipts[receiptId]
+			then
 				table.insert(profile.ReceiptOrder, receiptId)
+				orderedReceipts[receiptId] = true
 			end
 		end
 	end
@@ -166,13 +173,6 @@ local function reconcileProfile(config, savedProfile)
 
 	profile.Version = PROFILE_VERSION
 	return profile
-end
-
-local function trimReceipts(profile)
-	while #profile.ReceiptOrder > MAX_STORED_RECEIPTS do
-		local oldest = table.remove(profile.ReceiptOrder, 1)
-		profile.ProcessedReceipts[oldest] = nil
-	end
 end
 
 local function findDeveloperProduct(config, productId)
@@ -464,35 +464,27 @@ function PlayerDataService:ProcessReceipt(receiptInfo)
 
 	local receiptId = tostring(receiptInfo.PurchaseId)
 	local currentProfile = self._profiles[player]
-	if currentProfile.ProcessedReceipts[receiptId] then
+	if ReceiptLedger.Has(currentProfile, receiptId) then
 		return Enum.ProductPurchaseDecision.PurchaseGranted
 	end
 
 	if not self._persistenceEnabled then
-		currentProfile.Shards += product.Shards
-		currentProfile.Stats.RobuxPurchases += 1
-		currentProfile.Stats.PurchasedShards += product.Shards
-		currentProfile.ProcessedReceipts[receiptId] = true
-		table.insert(currentProfile.ReceiptOrder, receiptId)
-		trimReceipts(currentProfile)
+		ReceiptLedger.Grant(currentProfile, receiptId, product.Shards)
 		self:_emit(player)
 		return Enum.ProductPurchaseDecision.PurchaseGranted
 	end
 
-	local candidate = deepCopy(currentProfile)
-	candidate.Shards += product.Shards
-	candidate.Stats.RobuxPurchases += 1
-	candidate.Stats.PurchasedShards += product.Shards
-	candidate.ProcessedReceipts[receiptId] = true
-	table.insert(candidate.ReceiptOrder, receiptId)
-	trimReceipts(candidate)
+	local currentSnapshot = deepCopy(currentProfile)
 
 	local success, savedProfile = pcall(function()
 		return self._store:UpdateAsync("Player_" .. tostring(player.UserId), function(previous)
 			local stored = reconcileProfile(self._config, previous)
-			if stored.ProcessedReceipts[receiptId] then
+			if ReceiptLedger.Has(stored, receiptId) then
 				return stored
 			end
+			local candidate = deepCopy(currentSnapshot)
+			ReceiptLedger.MergeHistory(candidate, stored)
+			ReceiptLedger.Grant(candidate, receiptId, product.Shards)
 			return candidate
 		end)
 	end)

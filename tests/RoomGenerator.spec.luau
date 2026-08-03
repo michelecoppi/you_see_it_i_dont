@@ -3,12 +3,14 @@ local Workspace = game:GetService("Workspace")
 local Spec = {}
 
 local SEED = 424242
-local PRESETS = { "Signal", "PhaseFloor", "EchoSequence", "FrequencyDials", "PowerGrid" }
+local PRESETS = { "Signal", "PhaseFloor", "EchoSequence", "FrequencyDials", "PowerGrid", "MirrorRelay", "RuneCircuit" }
+local DIFFICULTIES = { "Easy", "Normal", "Hard" }
 
 local CONFIG = {
 	PuzzleOrder = PRESETS,
 	Round = {
 		WrongAnswerPenalty = 5,
+		Difficulty = "Normal",
 	},
 	Roles = {
 		Seer = "Seer",
@@ -19,16 +21,22 @@ local CONFIG = {
 		{
 			Id = "RED",
 			DisplayName = "RED",
+			Symbol = "CIRCLE",
+			Shape = Enum.PartType.Ball,
 			Color = Color3.fromRGB(255, 77, 90),
 		},
 		{
 			Id = "BLUE",
 			DisplayName = "BLUE",
+			Symbol = "SQUARE",
+			Shape = Enum.PartType.Block,
 			Color = Color3.fromRGB(63, 149, 255),
 		},
 		{
 			Id = "GREEN",
 			DisplayName = "GREEN",
+			Symbol = "RING",
+			Shape = Enum.PartType.Cylinder,
 			Color = Color3.fromRGB(73, 222, 128),
 		},
 	},
@@ -146,11 +154,12 @@ local function makeFixture(name)
 	return root, spawnPart
 end
 
-local function generate(RoomGenerator, preset, fixtureName)
+local function generate(RoomGenerator, preset, difficulty, fixtureName)
 	local root, spawnPart = makeFixture(fixtureName)
 	local generator = RoomGenerator.new(root, spawnPart, CONFIG)
 	local order = generator:Generate(Random.new(SEED), 1, {
 		ForcedPreset = preset,
+		Difficulty = difficulty,
 		StartRoomIndex = 1,
 		Seed = SEED,
 		SeedId = "SEED-0000424242",
@@ -211,48 +220,60 @@ local function expectGeometryOverlap(generator, target, label)
 end
 
 function Spec.run(RoomGenerator)
-	for _, preset in ipairs(PRESETS) do
-		local firstRoot, firstGenerator, firstOrder, firstValid, firstIssues =
-			generate(RoomGenerator, preset, "PresetTest_First_" .. preset)
-		expectEqual(firstOrder[1], preset, preset .. " forced placement")
-		expect(firstValid, preset .. " first validation failed: " .. table.concat(firstIssues, "; "))
+	for _, difficulty in ipairs(DIFFICULTIES) do
+		for _, preset in ipairs(PRESETS) do
+			local firstRoot, firstGenerator, firstOrder, firstValid, firstIssues =
+				generate(RoomGenerator, preset, difficulty, "PresetTest_First_" .. preset .. "_" .. difficulty)
+			expectEqual(firstOrder[1], preset, preset .. " forced placement")
+			expect(firstValid, preset .. " first validation failed: " .. table.concat(firstIssues, "; "))
+			local firstGenerated = firstRoot:FindFirstChild("GeneratedRooms")
+			expect(firstGenerated ~= nil, preset .. " generated folder exists")
+			expectEqual(firstGenerated:GetAttribute("Difficulty"), difficulty, preset .. " folder difficulty")
+			local firstRoom = firstGenerated:FindFirstChildWhichIsA("Model")
+			expect(firstRoom ~= nil, preset .. " generated room exists")
+			expectEqual(firstRoom:GetAttribute("Difficulty"), difficulty, preset .. " room difficulty")
 
-		local seerCount, operatorPromptCount, invalidRoles = countRoleContracts(firstRoot)
-		expectEqual(seerCount, 0, preset .. " must not replicate Seer-only clues in the DataModel")
-		expect(#firstGenerator:GetSeerClues() > 0, preset .. " must retain a private Seer clue payload")
-		expectEqual(#invalidRoles, 0, preset .. " uses only known role markers")
-		if preset ~= "PhaseFloor" then
-			expect(operatorPromptCount > 0, preset .. " must expose an Operator prompt")
+			local seerCount, operatorPromptCount, invalidRoles = countRoleContracts(firstRoot)
+			expectEqual(seerCount, 0, preset .. " must not replicate Seer-only clues in the DataModel")
+			expect(#firstGenerator:GetSeerClues() > 0, preset .. " must retain a private Seer clue payload")
+			expectEqual(#invalidRoles, 0, preset .. " uses only known role markers")
+			if preset ~= "PhaseFloor" then
+				expect(operatorPromptCount > 0, preset .. " must expose an Operator prompt")
+			end
+			local geometryRoles = countGeometryRoles(firstRoot)
+			expect((geometryRoles.Gate or 0) > 0, preset .. " marks its gate for volumetric validation")
+			expect((geometryRoles.Spawn or 0) > 0, preset .. " marks its spawn for volumetric validation")
+			if preset == "PhaseFloor" then
+				expect((geometryRoles.Path or 0) > 0, preset .. " marks its traversable path")
+			else
+				expect((geometryRoles.Console or 0) > 0, preset .. " marks its consoles for volumetric validation")
+			end
+
+			local firstSnapshot = snapshot(firstGenerated)
+
+			local secondRoot, secondGenerator, secondOrder, secondValid, secondIssues =
+				generate(RoomGenerator, preset, difficulty, "PresetTest_Second_" .. preset .. "_" .. difficulty)
+			expectEqual(secondOrder[1], preset, preset .. " repeated forced placement")
+			expect(secondValid, preset .. " repeated validation failed: " .. table.concat(secondIssues, "; "))
+			local secondGenerated = secondRoot:FindFirstChild("GeneratedRooms")
+			expect(secondGenerated ~= nil, preset .. " repeated generated folder exists")
+			expectEqual(snapshot(secondGenerated), firstSnapshot, preset .. " is deterministic for the same seed")
+
+			firstGenerator:Destroy()
+			secondGenerator:Destroy()
+			firstRoot:Destroy()
+			secondRoot:Destroy()
+			print(
+				string.format(
+					"[QA][Tests] preset=%s | difficulty=%s | seed=SEED-0000424242 | runs=2 | result=PASS",
+					preset,
+					difficulty
+				)
+			)
 		end
-		local geometryRoles = countGeometryRoles(firstRoot)
-		expect((geometryRoles.Gate or 0) > 0, preset .. " marks its gate for volumetric validation")
-		expect((geometryRoles.Spawn or 0) > 0, preset .. " marks its spawn for volumetric validation")
-		if preset == "PhaseFloor" then
-			expect((geometryRoles.Path or 0) > 0, preset .. " marks its traversable path")
-		else
-			expect((geometryRoles.Console or 0) > 0, preset .. " marks its consoles for volumetric validation")
-		end
-
-		local firstGenerated = firstRoot:FindFirstChild("GeneratedRooms")
-		expect(firstGenerated ~= nil, preset .. " generated folder exists")
-		local firstSnapshot = snapshot(firstGenerated)
-
-		local secondRoot, secondGenerator, secondOrder, secondValid, secondIssues =
-			generate(RoomGenerator, preset, "PresetTest_Second_" .. preset)
-		expectEqual(secondOrder[1], preset, preset .. " repeated forced placement")
-		expect(secondValid, preset .. " repeated validation failed: " .. table.concat(secondIssues, "; "))
-		local secondGenerated = secondRoot:FindFirstChild("GeneratedRooms")
-		expect(secondGenerated ~= nil, preset .. " repeated generated folder exists")
-		expectEqual(snapshot(secondGenerated), firstSnapshot, preset .. " is deterministic for the same seed")
-
-		firstGenerator:Destroy()
-		secondGenerator:Destroy()
-		firstRoot:Destroy()
-		secondRoot:Destroy()
-		print(string.format("[QA][Tests] preset=%s | seed=SEED-0000424242 | runs=2 | result=PASS", preset))
 	end
 
-	local geometryRoot, geometryGenerator = generate(RoomGenerator, "Signal", "GeometryOverlapContracts")
+	local geometryRoot, geometryGenerator = generate(RoomGenerator, "Signal", "Normal", "GeometryOverlapContracts")
 	local gate = geometryRoot:FindFirstChild("RoomGate_1", true)
 	local console = geometryRoot:FindFirstChild("ConsoleBase_RED", true)
 	local spawnPart = geometryRoot:FindFirstChild("TestSpawn")

@@ -19,9 +19,11 @@ local function acknowledgeCase()
 		kind = "CaseAck",
 		caseId = caseId,
 		preset = workspace:GetAttribute("RuntimeQAPreset"),
+		difficulty = workspace:GetAttribute("RuntimeQADifficulty"),
 		role = player:GetAttribute("Role"),
 		roomName = room and room.Name or "missing",
 		seedId = generated and generated:GetAttribute("SeedId") or "missing",
+		generatedDifficulty = generated and generated:GetAttribute("Difficulty") or "missing",
 	})
 end
 

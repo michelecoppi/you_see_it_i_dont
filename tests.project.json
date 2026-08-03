@@ -18,6 +18,12 @@
         },
         "RemoteGuard": {
           "$path": "src/server/RemoteGuard.luau"
+        },
+        "ReceiptLedger": {
+          "$path": "src/server/ReceiptLedger.luau"
+        },
+        "RoundCompletionValidator": {
+          "$path": "src/server/RoundCompletionValidator.luau"
         }
       },
       "Tests": {

@@ -72,10 +72,27 @@
 - **Completato nel codice:** Alternate Vision e interazioni console server-authoritative con schema di validazione unico.
 - **Completato nel codice:** `RemoteGuard` con contratti payload rigorosi, rate limit separati per lobby, visione,
   economia e puzzle, logging campionato dei rifiuti e fuzz test dedicati.
-- Aggiungere livelli di difficolta espliciti.
+- **Implementato nel codice:** livelli espliciti `Easy`, `Normal` e `Hard`, propagati in generazione, QA, telemetria
+  e pannello client; i vincoli logici sono specifici per preset e la matrice pura copre 5.000 seed per combinazione.
+- **Verificato in Studio:** suite logica da 75.000 generazioni e matrice runtime estesa con 1, 2 e 6 client
+  (`90/90` casi, `270/270` ACK e probe errori `9/9`).
+- **Completato e verificato:** ricevute Developer Product idempotenti senza scadenza delle ricevute storiche;
+  retry, cronologia lunga e riconnessione coperti dalla suite Studio.
+- **Completato e verificato:** estrazione convalidata dal server per progresso stanze, tempo minimo, partecipazione,
+  stato del goal e distanza reale dal pad; i tentativi implausibili vengono rifiutati e registrati.
 
 ## Rollback e flag
 
 - La modalita QA e disattivata di default (`Config.QA.Enabled = false`) e viene ignorata fuori da Studio.
 - Il logging extra fuori da Studio e disattivato di default (`Config.Debug.EnableServerLog = false`).
 - L'ambiente pubblicato torna a Production impostando `Environment.PublishedEnvironment = Environment.Names.Production`.
+
+## Milestone 2 - avanzamento
+
+- Catalogo portato da 5 a 7 preset con `MirrorRelay` e `RuneCircuit` in rotazione.
+- Suite pura: 5.000 seed per preset e livello, `105.000/105.000` generazioni PASS.
+- Integrazione deterministica Studio: 7 preset x 3 livelli x 2 run, `42/42` PASS.
+- Runtime Studio: `42/42` casi con 1, 2 e 6 client; totale `126/126` casi, `378/378` ACK e probe `9/9`.
+- Signal ed Echo distinguono gli input con parole e forme oltre al colore; Echo mostra il progresso pubblico.
+- Invisible Floor richiede il passaggio ordinato delle righe per lo stesso Operator e rifiuta salti o deviazioni.
+- Resta aperta la matrice manuale su touch, gamepad, R6/R15, scale avatar, latenza e riconnessione.

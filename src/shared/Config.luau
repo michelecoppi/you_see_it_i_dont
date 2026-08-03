@@ -1,4 +1,5 @@
 local BuildInfo = require(script.Parent.BuildInfo)
+local Difficulty = require(script.Parent.Difficulty)
 local Environment = require(script.Parent.Environment)
 local EnvironmentConfig = require(script.Parent.EnvironmentConfig)
 
@@ -19,6 +20,8 @@ Config.PuzzleOrder = {
 	"EchoSequence",
 	"FrequencyDials",
 	"PowerGrid",
+	"MirrorRelay",
+	"RuneCircuit",
 }
 
 Config.Telemetry = Config.EnvironmentProfile.Telemetry
@@ -37,6 +40,12 @@ Config.Round = {
 	MinimumPlayTime = 60,
 	ResultDuration = 6,
 	WrongAnswerPenalty = 5,
+	Difficulty = Difficulty.Default,
+}
+
+Config.Difficulty = {
+	Default = Difficulty.Default,
+	Levels = table.clone(Difficulty.Order),
 }
 
 Config.AlternateVision = {
@@ -51,8 +60,15 @@ Config.Interactions = {
 		EchoButton = 0.45,
 		FrequencyDial = 0.25,
 		GridNode = 0.25,
+		MirrorRotate = 0.25,
+		RuneButton = 0.45,
 		SignalButton = 0.55,
 	},
+}
+
+Config.Security = {
+	MinimumCompletionSecondsPerRoom = 2,
+	ExtractionMaximumDistance = 14,
 }
 
 Config.RemoteGuard = {
@@ -69,6 +85,7 @@ Config.RemoteGuard = {
 
 Config.QA = {
 	Enabled = false,
+	Difficulty = Difficulty.Default,
 	PlayerCount = 1,
 	StartRoom = 1,
 }
@@ -87,16 +104,22 @@ Config.Signals = {
 	{
 		Id = "RED",
 		DisplayName = "RED",
+		Symbol = "CIRCLE",
+		Shape = Enum.PartType.Ball,
 		Color = Color3.fromRGB(255, 77, 90),
 	},
 	{
 		Id = "BLUE",
 		DisplayName = "BLUE",
+		Symbol = "SQUARE",
+		Shape = Enum.PartType.Block,
 		Color = Color3.fromRGB(63, 149, 255),
 	},
 	{
 		Id = "GREEN",
 		DisplayName = "GREEN",
+		Symbol = "RING",
+		Shape = Enum.PartType.Cylinder,
 		Color = Color3.fromRGB(73, 222, 128),
 	},
 }

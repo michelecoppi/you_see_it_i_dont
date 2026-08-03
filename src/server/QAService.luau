@@ -8,6 +8,7 @@ QAService.__index = QAService
 local ATTRIBUTE_NAMES = {
 	Enabled = "QAEnabled",
 	Seed = "QASeed",
+	Difficulty = "QADifficulty",
 	Preset = "QAPreset",
 	Role = "QARole",
 	PlayerCount = "QAPlayerCount",
@@ -54,6 +55,11 @@ function QAService.new(config, seedUtil)
 		1,
 		config.Round.RoomCount or 3
 	)
+	local difficultyLevels = (config.Difficulty and config.Difficulty.Levels) or { "Easy", "Normal", "Hard" }
+	local defaultDifficulty = (config.Difficulty and config.Difficulty.Default) or "Normal"
+	local requestedDifficulty =
+		tostring(getAttributeOrDefault(ATTRIBUTE_NAMES.Difficulty, defaults.Difficulty or defaultDifficulty) or "")
+	self.Difficulty = if contains(difficultyLevels, requestedDifficulty) then requestedDifficulty else defaultDifficulty
 
 	local requestedSeed = getAttributeOrDefault(ATTRIBUTE_NAMES.Seed, defaults.Seed)
 	self.Seed = if requestedSeed ~= nil then seedUtil.Normalize(requestedSeed) else nil
@@ -75,9 +81,10 @@ function QAService.new(config, seedUtil)
 	if self.Enabled then
 		print(
 			string.format(
-				"[QA][Server] enabled | seed=%s | preset=%s | role=%s | players=%d | startRoom=%d",
+				"[QA][Server] enabled | seed=%s | preset=%s | difficulty=%s | role=%s | players=%d | startRoom=%d",
 				self.Seed and seedUtil.Identifier(self.Seed) or "automatic",
 				self.Preset or "random",
+				self.Difficulty,
 				self.Role or "automatic",
 				self.PlayerCount,
 				self.StartRoom
@@ -134,6 +141,7 @@ function QAService:GetGenerationOptions()
 	return {
 		ForcedPreset = self.Preset,
 		StartRoomIndex = self.StartRoom,
+		Difficulty = self.Difficulty,
 	}
 end
 

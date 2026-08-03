@@ -510,13 +510,14 @@ roundStateRemote.OnClientEvent:Connect(function(state)
 	qaPanel.Visible = qaLoggingEnabled and nextPhase ~= "Lobby"
 	if qaPanel.Visible then
 		qaLabel.Text = string.format(
-			"QA CLIENT | %s | %s\n%s | room %s (start %s) | %s",
+			"QA CLIENT | %s | %s\n%s | room %s (start %s) | %s | %s",
 			tostring(state.buildVersion or "unknown build"),
 			tostring(state.environment or "unknown environment"),
 			tostring(state.seedId or "no seed"),
 			tostring(state.qaRoom or "-"),
 			tostring(state.qaStartRoom or "-"),
-			tostring(state.qaPreset or "generating")
+			tostring(state.qaPreset or "generating"),
+			tostring(state.qaDifficulty or state.difficulty or "Normal")
 		)
 	end
 	local inLobby = currentPhase == "Lobby"
@@ -536,9 +537,14 @@ roundStateRemote.OnClientEvent:Connect(function(state)
 			(Config.AlternateVision and Config.AlternateVision.Duration) or 4
 		)
 		else state.instructions or ""
-	phaseLabel.Text = string.upper(state.phase or "WAITING") .. "  |  ROUND " .. tostring(state.roundNumber or 0)
+	local difficultyLabel = string.upper(tostring(state.difficulty or Config.Round.Difficulty or "Normal"))
+	phaseLabel.Text = string.upper(state.phase or "WAITING")
+		.. "  |  "
+		.. difficultyLabel
+		.. "  |  R"
+		.. tostring(state.roundNumber or 0)
 	timerLabel.Text = tostring(state.timeLeft or 0)
-	compactPhaseLabel.Text = string.upper(state.phase or "WAITING") .. "  |  R" .. tostring(state.roundNumber or 0)
+	compactPhaseLabel.Text = string.upper(state.phase or "WAITING") .. "  |  " .. difficultyLabel
 	compactTimerLabel.Text = tostring(state.timeLeft or 0)
 	statusLabel.Text = state.status or ""
 

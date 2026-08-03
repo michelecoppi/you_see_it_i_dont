@@ -11,8 +11,8 @@ La stima iniziale è di **14-18 settimane per uno sviluppatore**, da ricalibrare
 Il prototipo dispone già di:
 
 - lobby fisica, coda Solo e Gruppo da 2-6 giocatori;
-- round con 3 stanze estratte casualmente da 5 preset;
-- Signal Chamber, Invisible Floor, Echo Sequence, Frequency Vault e Power Grid;
+- round con 3 stanze estratte casualmente da 7 preset;
+- Signal Chamber, Invisible Floor, Echo Sequence, Frequency Vault, Power Grid, Mirror Relay e Rune Circuit;
 - ruoli Seer, Operator e modalità Solo con Alternate Vision;
 - profilo persistente, Reality Shards, ricompensa giornaliera, statistiche e telemetria per puzzle;
 - catalogo cosmetici, Game Pass e Developer Product già predisposti nel codice;
@@ -442,6 +442,8 @@ Se un gate fallisce, si corregge il sistema responsabile e si ripete la finestra
 - Cambiare una variabile economica alla volta e annotare versione/data per attribuire l'effetto.
 
 ## Ordine operativo immediato
+
+Stato al 2026-08-02: punti 1-4 completati nel codice e verificati dalla suite Studio; il prossimo blocco e il punto 5.
 
 1. Costruire QA mode, seed riproducibili e validatore delle stanze.
 2. Spostare gli indizi segreti fuori dagli oggetti replicati e completare le validazioni server.

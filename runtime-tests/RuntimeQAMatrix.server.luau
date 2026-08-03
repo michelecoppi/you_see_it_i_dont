@@ -165,106 +165,118 @@ local function run()
 	local passed = 0
 	local caseId = 0
 
-	for _, preset in ipairs(Config.PuzzleOrder) do
-		for runIndex = 1, 2 do
-			caseId += 1
-			local roles = assignRoles(players, runIndex)
-			local order = generator:Generate(Random.new(SEED), 1, {
-				ForcedPreset = preset,
-				StartRoomIndex = 1,
-				Seed = SEED,
-				SeedId = SEED_ID,
-				BuildVersion = Config.Build.DisplayVersion,
-				Environment = Config.EnvironmentName,
-			})
-			local valid, validationIssues = generator:Validate()
-			local seerMarkers, operatorMarkers, invalidMarkers = countRoleMarkers(root)
-			local seerClues = generator:GetSeerClues()
-			local issues = {}
-			if order[1] ~= preset then
-				table.insert(issues, "forced preset mismatch")
-			end
-			if not valid then
-				appendIssues(issues, "validation: ", validationIssues)
-			end
-			if seerMarkers > 0 then
-				table.insert(issues, "Seer clue leaked into replicated DataModel")
-			end
-			if #seerClues == 0 then
-				table.insert(issues, "missing private Seer clue payload")
-			end
-			if preset ~= "PhaseFloor" and operatorMarkers == 0 then
-				table.insert(issues, "missing Operator interaction")
-			end
-			if invalidMarkers > 0 then
-				table.insert(issues, "unknown role markers")
-			end
-
-			roundDebug:Begin(Config.Build.DisplayVersion, Config.EnvironmentName, SEED_ID, { preset })
-			roundDebug:Log("RuntimeMatrixCase", {
-				case = caseId,
-				clients = #players,
-				preset = preset,
-				roles = roles,
-				run = runIndex,
-			})
-			workspace:SetAttribute("RuntimeQAPreset", preset)
-			workspace:SetAttribute("RuntimeQARun", runIndex)
-			workspace:SetAttribute("RuntimeQASeedId", SEED_ID)
-			workspace:SetAttribute("RuntimeQACaseId", caseId)
-
-			local receivedAllAcks = waitUntil(function()
-				local acknowledgements = caseAcks[caseId] or {}
-				for _, player in ipairs(players) do
-					local ack = acknowledgements[player]
-					if
-						not ack
-						or ack.preset ~= preset
-						or ack.role ~= player:GetAttribute("Role")
-						or not string.find(ack.roomName or "", preset, 1, true)
-						or ack.seedId ~= SEED_ID
-					then
-						return false
-					end
+	for _, difficulty in ipairs(Config.Difficulty.Levels) do
+		for _, preset in ipairs(Config.PuzzleOrder) do
+			for runIndex = 1, 2 do
+				caseId += 1
+				local roles = assignRoles(players, runIndex)
+				local order = generator:Generate(Random.new(SEED), 1, {
+					ForcedPreset = preset,
+					Difficulty = difficulty,
+					StartRoomIndex = 1,
+					Seed = SEED,
+					SeedId = SEED_ID,
+					BuildVersion = Config.Build.DisplayVersion,
+					Environment = Config.EnvironmentName,
+				})
+				local valid, validationIssues = generator:Validate()
+				local seerMarkers, operatorMarkers, invalidMarkers = countRoleMarkers(root)
+				local seerClues = generator:GetSeerClues()
+				local issues = {}
+				if order[1] ~= preset then
+					table.insert(issues, "forced preset mismatch")
 				end
-				return true
-			end, ACK_TIMEOUT_SECONDS)
-			if not receivedAllAcks then
-				table.insert(issues, "missing or invalid client acknowledgement")
-			end
+				local generated = root:FindFirstChild("GeneratedRooms")
+				if not generated or generated:GetAttribute("Difficulty") ~= difficulty then
+					table.insert(issues, "generated difficulty mismatch")
+				end
+				if not valid then
+					appendIssues(issues, "validation: ", validationIssues)
+				end
+				if seerMarkers > 0 then
+					table.insert(issues, "Seer clue leaked into replicated DataModel")
+				end
+				if #seerClues == 0 then
+					table.insert(issues, "missing private Seer clue payload")
+				end
+				if preset ~= "PhaseFloor" and operatorMarkers == 0 then
+					table.insert(issues, "missing Operator interaction")
+				end
+				if invalidMarkers > 0 then
+					table.insert(issues, "unknown role markers")
+				end
 
-			for _, player in ipairs(players) do
-				telemetry:Log(
-					player,
-					"QAMatrixCase",
-					1,
-					{ tostring(#players) .. "Clients", preset, player:GetAttribute("Role") }
-				)
-			end
-			if #issues == 0 then
-				passed += 1
-				print(
-					string.format(
-						"[QA][Matrix] case=%d | clients=%d | preset=%s | run=%d | roles=%s | result=PASS",
-						caseId,
-						#players,
-						preset,
-						runIndex,
-						roles
+				roundDebug:Begin(Config.Build.DisplayVersion, Config.EnvironmentName, SEED_ID, { preset })
+				roundDebug:Log("RuntimeMatrixCase", {
+					case = caseId,
+					clients = #players,
+					preset = preset,
+					roles = roles,
+					run = runIndex,
+					difficulty = difficulty,
+				})
+				workspace:SetAttribute("RuntimeQAPreset", preset)
+				workspace:SetAttribute("RuntimeQADifficulty", difficulty)
+				workspace:SetAttribute("RuntimeQARun", runIndex)
+				workspace:SetAttribute("RuntimeQASeedId", SEED_ID)
+				workspace:SetAttribute("RuntimeQACaseId", caseId)
+
+				local receivedAllAcks = waitUntil(function()
+					local acknowledgements = caseAcks[caseId] or {}
+					for _, player in ipairs(players) do
+						local ack = acknowledgements[player]
+						if
+							not ack
+							or ack.preset ~= preset
+							or ack.difficulty ~= difficulty
+							or ack.generatedDifficulty ~= difficulty
+							or ack.role ~= player:GetAttribute("Role")
+							or not string.find(ack.roomName or "", preset, 1, true)
+							or ack.seedId ~= SEED_ID
+						then
+							return false
+						end
+					end
+					return true
+				end, ACK_TIMEOUT_SECONDS)
+				if not receivedAllAcks then
+					table.insert(issues, "missing or invalid client acknowledgement")
+				end
+
+				for _, player in ipairs(players) do
+					telemetry:Log(player, "QAMatrixCase", 1, {
+						tostring(#players) .. "Clients",
+						preset .. ":" .. difficulty,
+						player:GetAttribute("Role"),
+					})
+				end
+				if #issues == 0 then
+					passed += 1
+					print(
+						string.format(
+							"[QA][Matrix] case=%d | clients=%d | preset=%s | difficulty=%s | run=%d | roles=%s | result=PASS",
+							caseId,
+							#players,
+							preset,
+							difficulty,
+							runIndex,
+							roles
+						)
 					)
-				)
-			else
-				appendIssues(failures, string.format("case %d %s: ", caseId, preset), issues)
-				warn(
-					string.format(
-						"[QA][Matrix] case=%d | clients=%d | preset=%s | run=%d | result=FAIL | issues=%s",
-						caseId,
-						#players,
-						preset,
-						runIndex,
-						table.concat(issues, "; ")
+				else
+					appendIssues(failures, string.format("case %d %s %s: ", caseId, preset, difficulty), issues)
+					warn(
+						string.format(
+							"[QA][Matrix] case=%d | clients=%d | preset=%s | difficulty=%s | run=%d | result=FAIL | issues=%s",
+							caseId,
+							#players,
+							preset,
+							difficulty,
+							runIndex,
+							table.concat(issues, "; ")
+						)
 					)
-				)
+				end
 			end
 		end
 	end

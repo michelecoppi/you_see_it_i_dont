@@ -22,13 +22,16 @@ l'ambiente viene scelto dal valore versionato `Environment.PublishedEnvironment`
 4. La spedizione genera tre mini-stanze in ordine casuale.
 5. Completate tutte le stanze, il gruppo raggiunge la piattaforma di estrazione e riceve Reality Shards.
 
+La difficolta del round e esplicita e versionata: `Easy`, `Normal` (default) o `Hard`. Il livello viene scelto dal
+server, applicato in modo deterministico a tutte le stanze della spedizione e mostrato nell'HUD.
+
 ## Mini-stanze procedurali
 
-- **Signal Chamber**: il Seer vede il colore corretto, l'Operator attiva la console corrispondente.
-- **Invisible Floor**: il Seer vede il percorso sicuro, l'Operator deve attraversarlo.
-- **Echo Sequence**: il Seer legge una sequenza di tre colori, l'Operator la ripete nell'ordine giusto.
-- **Frequency Vault**: il Seer legge tre frequenze nascoste, l'Operator regola i quadranti.
-- **Power Grid**: ogni interruttore modifica anche i nodi adiacenti; il Seer vede la configurazione obiettivo.
+- **Signal Chamber**: sequenza nascosta di 1, 2 o 3 segnali.
+- **Invisible Floor**: percorso rettilineo, variabile o con una svolta obbligatoria a ogni riga.
+- **Echo Sequence**: sequenza nascosta di 3, 4 o 5 colori.
+- **Frequency Vault**: ogni quadrante richiede esattamente 1, 2 o 3 scatti in avanti.
+- **Power Grid**: configurazione con soluzione ottima garantita di 1, 2 o 3 pressioni.
 
 Ogni spedizione sceglie tre preset diversi e ne mescola l'ordine. La soluzione, lo stato iniziale e la validazione dei
 cinque puzzle sono moduli puri in `src/shared/Puzzles`; `RoomGenerator.luau` si occupa della rappresentazione e delle
@@ -102,6 +105,7 @@ seguenti su `Workspace` dalla finestra Properties o dalla Command Bar:
 | `QAEnabled` | boolean | `true` | Attiva l'avvio automatico QA. |
 | `QASeed` | number | `424242` | Riproduce la stessa generazione. |
 | `QAPreset` | string | `PowerGrid` | Forza il preset nella stanza iniziale scelta. |
+| `QADifficulty` | string | `Hard` | Seleziona `Easy`, `Normal` o `Hard` per l'intera spedizione. |
 | `QARole` | string | `Operator` | Assegna il ruolo al primo tester; il secondo riceve il ruolo complementare. |
 | `QAPlayerCount` | number | `2` | Attende questo numero di player Studio, da 1 a 6. |
 | `QAStartRoom` | number | `2` | Apre le stanze precedenti e avvia direttamente questa stanza. |
@@ -112,12 +116,13 @@ Esempio dalla Command Bar:
 workspace:SetAttribute("QAEnabled", true)
 workspace:SetAttribute("QASeed", 424242)
 workspace:SetAttribute("QAPreset", "PowerGrid")
+workspace:SetAttribute("QADifficulty", "Hard")
 workspace:SetAttribute("QARole", "Operator")
 workspace:SetAttribute("QAPlayerCount", 1)
 workspace:SetAttribute("QAStartRoom", 1)
 ```
 
-Il pannello arancione mostra lato client build, ambiente, seed, stanza e preset. L'Output usa il prefisso `[QA][Server]`
+Il pannello arancione mostra lato client build, ambiente, seed, stanza, preset e difficolta. L'Output usa il prefisso `[QA][Server]`
 per generazione, tempi, interazioni, errori e motivo di conclusione; gli errori locali usano `[QA][Client]`.
 
 ## Controlli di qualita
@@ -158,6 +163,7 @@ Collega il plugin Rojo 7 di Roblox Studio a `localhost:34872`, quindi premi **Pl
 - `src/client/SeerClueRenderer.luau`: costruzione locale degli indizi ricevuti soltanto da Seer/Solo.
 - `src/client/LobbyController.luau`: stato della coda, shop cosmetico, loadout e statistiche.
 - `src/shared/Config.luau`: bilanciamento, catalogo e configurazione monetizzazione.
+- `src/shared/Difficulty.luau`: nomi, ordine, default e normalizzazione dei livelli di difficolta.
 - `src/shared/BuildInfo.luau`: versione baseline e build ID.
 - `src/shared/EnvironmentConfig.luau`: profili per ambiente.
 - `src/shared/SeedUtil.luau`: validazione e identificatore stabile dei seed.

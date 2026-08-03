@@ -4,12 +4,15 @@ local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Puzzles = Shared:WaitForChild("Puzzles")
+local Difficulty = require(Shared:WaitForChild("Difficulty"))
 local PresetOrder = require(Shared:WaitForChild("PresetOrder"))
 local SignalPuzzle = require(Puzzles:WaitForChild("Signal"))
 local PhaseFloorPuzzle = require(Puzzles:WaitForChild("PhaseFloor"))
 local EchoSequencePuzzle = require(Puzzles:WaitForChild("EchoSequence"))
 local FrequencyDialsPuzzle = require(Puzzles:WaitForChild("FrequencyDials"))
+local MirrorRelayPuzzle = require(Puzzles:WaitForChild("MirrorRelay"))
 local PowerGridPuzzle = require(Puzzles:WaitForChild("PowerGrid"))
+local RuneCircuitPuzzle = require(Puzzles:WaitForChild("RuneCircuit"))
 local InteractionValidator = require(script.Parent:WaitForChild("InteractionValidator"))
 
 local RoomGenerator = {}
@@ -17,7 +20,7 @@ RoomGenerator.__index = RoomGenerator
 
 local ROOM_CENTERS = { -45, -4, 37 }
 local ROOM_ENDS = { -24, 17, 58 }
-local PRESETS = { "Signal", "PhaseFloor", "EchoSequence", "FrequencyDials", "PowerGrid" }
+local PRESETS = { "Signal", "PhaseFloor", "EchoSequence", "FrequencyDials", "PowerGrid", "MirrorRelay", "RuneCircuit" }
 local FLOOR_SURFACE_CLEARANCE = 0.01
 local ROOM_THRESHOLD_HEIGHT = 0.1
 local PHASE_CHASM_HEIGHT = 0.06
@@ -167,8 +170,16 @@ local function getPresetColor(preset)
 		return COLORS.Blue
 	elseif preset == "FrequencyDials" then
 		return Color3.fromRGB(255, 177, 66)
+	elseif preset == "MirrorRelay" then
+		return Color3.fromRGB(92, 225, 255)
+	elseif preset == "RuneCircuit" then
+		return Color3.fromRGB(255, 126, 210)
 	end
 	return Color3.fromRGB(94, 255, 151)
+end
+
+local function signalLabel(signal)
+	return tostring(signal.Symbol or signal.DisplayName) .. " " .. tostring(signal.DisplayName)
 end
 
 local function geometryRole(part, spawnPart)
@@ -209,6 +220,7 @@ function RoomGenerator.new(mapRoot, spawnPart, config, callbacks)
 	self._currentRoomIndex = 0
 	self._goalUnlocked = false
 	self._lastConsoleInteraction = {}
+	self._lastGoalTouch = {}
 	return self
 end
 
@@ -426,11 +438,206 @@ function RoomGenerator:_completeRoom(room, player)
 	end
 end
 
-function RoomGenerator:_buildFrequencyRoom(room, randomGenerator)
+function RoomGenerator:_buildMirrorRelayRoom(room, randomGenerator, difficulty)
+	room.DisplayName = "Mirror Relay"
+	self:_addRoomHeader(
+		room,
+		"MIRROR RELAY",
+		"ALIGN EVERY REFLECTOR WITH THE HIDDEN ROUTE",
+		Color3.fromRGB(92, 225, 255)
+	)
+
+	local orientationNames = { "NE", "SE", "SW", "NW" }
+	local solution = MirrorRelayPuzzle.GenerateSolution(randomGenerator, difficulty)
+	local state = MirrorRelayPuzzle.BuildInitialState(solution)
+	local targetNames = table.create(#solution.Targets)
+	for index, target in ipairs(solution.Targets) do
+		targetNames[index] = orientationNames[target]
+	end
+
+	local routeDisplay = createPart(
+		room.Model,
+		"MirrorRouteDisplay",
+		Vector3.new(22, 5.5, 0.7),
+		CFrame.new(0, 6, room.CenterZ - 9),
+		COLORS.Dark,
+		Enum.Material.Metal
+	)
+	routeDisplay.CanCollide = false
+	markRoomActive(routeDisplay)
+	self:_addSeerBillboard(
+		room,
+		routeDisplay,
+		"MirrorRoute",
+		"ALIGN  " .. table.concat(targetNames, "  >  "),
+		Color3.fromRGB(170, 244, 255),
+		UDim2.fromOffset(520, 86),
+		Vector3.new(0, 0, 0)
+	)
+
+	for index, initialOrientation in ipairs(state.Orientations) do
+		local x = (index - (#state.Orientations + 1) / 2) * 10
+		local base = createPart(
+			room.Model,
+			"MirrorBase_" .. tostring(index),
+			Vector3.new(7, 2, 6),
+			CFrame.new(x, 1.4, room.CenterZ + 8),
+			COLORS.Metal,
+			Enum.Material.DiamondPlate
+		)
+		local mirror = createPart(
+			room.Model,
+			"RelayMirror_" .. tostring(index),
+			Vector3.new(0.6, 5, 4.5),
+			CFrame.new(x, 4.6, room.CenterZ + 8) * CFrame.Angles(0, math.rad((initialOrientation - 1) * 45), 0),
+			Color3.fromRGB(170, 244, 255),
+			Enum.Material.Glass
+		)
+		mirror.Reflectance = 0.35
+		local geometryGroup = string.format("Console_%d_%d", room.Index, index)
+		markGeometry(base, GEOMETRY_ROLES.Console, geometryGroup)
+		markGeometry(mirror, GEOMETRY_ROLES.Console, geometryGroup)
+		local readout = addBillboard(
+			mirror,
+			orientationNames[initialOrientation],
+			Color3.fromRGB(170, 244, 255),
+			UDim2.fromOffset(86, 56),
+			Vector3.new(0, 3.6, 0)
+		)
+		local readoutLabel = readout:FindFirstChildOfClass("TextLabel")
+		local prompt =
+			makePrompt(mirror, "ROTATE +45", "MIRROR " .. tostring(index), self._config.Roles.Operator, "MirrorRotate")
+
+		self:_connect(prompt.Triggered, function(player)
+			if not self:_canUseConsole(player, room, prompt, "MirrorRotate") then
+				return
+			end
+			self:_interaction(player, room, "MirrorRotate")
+			local solved = MirrorRelayPuzzle.Rotate(solution, state, index)
+			local orientation = state.Orientations[index]
+			mirror.CFrame = CFrame.new(mirror.Position) * CFrame.Angles(0, math.rad((orientation - 1) * 45), 0)
+			readoutLabel.Text = orientationNames[orientation]
+			if solved then
+				self:_completeRoom(room, player)
+			else
+				self:_status("Mirror " .. tostring(index) .. " aligned " .. orientationNames[orientation] .. ".")
+			end
+		end)
+	end
+end
+
+function RoomGenerator:_buildRuneCircuitRoom(room, randomGenerator, difficulty)
+	room.DisplayName = "Rune Circuit"
+	self:_addRoomHeader(
+		room,
+		"RUNE CIRCUIT",
+		"SEER DECODES THE ORDER - OPERATOR LINKS IT",
+		Color3.fromRGB(255, 126, 210)
+	)
+
+	local runes = {
+		{ Name = "SUN", Color = Color3.fromRGB(255, 194, 92) },
+		{ Name = "MOON", Color = Color3.fromRGB(150, 176, 255) },
+		{ Name = "STAR", Color = Color3.fromRGB(255, 245, 155) },
+		{ Name = "WAVE", Color = Color3.fromRGB(92, 225, 255) },
+		{ Name = "EYE", Color = Color3.fromRGB(255, 126, 210) },
+	}
+	local solution = RuneCircuitPuzzle.GenerateSolution(randomGenerator, difficulty)
+	local state = RuneCircuitPuzzle.BuildInitialState(solution)
+	local targetNames = table.create(#solution.SequenceIndices)
+	for index, runeIndex in ipairs(solution.SequenceIndices) do
+		targetNames[index] = runes[runeIndex].Name
+	end
+
+	local circuitDisplay = createPart(
+		room.Model,
+		"RuneCircuitDisplay",
+		Vector3.new(22, 5.5, 0.7),
+		CFrame.new(0, 6, room.CenterZ - 9),
+		COLORS.Dark,
+		Enum.Material.Metal
+	)
+	circuitDisplay.CanCollide = false
+	markRoomActive(circuitDisplay)
+	self:_addSeerBillboard(
+		room,
+		circuitDisplay,
+		"RuneOrder",
+		table.concat(targetNames, "  >  "),
+		Color3.fromRGB(255, 190, 230),
+		UDim2.fromOffset(520, 86),
+		Vector3.new(0, 0, 0)
+	)
+	local progressLabel, progressGui = addSurfaceText(
+		circuitDisplay,
+		"LINK 0 / " .. tostring(#solution.SequenceIndices),
+		Enum.NormalId.Front,
+		Color3.fromRGB(255, 190, 230)
+	)
+	markRoomActive(progressGui)
+
+	for index, rune in ipairs(runes) do
+		local x = (3 - index) * 12
+		local base = createPart(
+			room.Model,
+			"RuneBase_" .. tostring(index),
+			Vector3.new(7, 2, 7),
+			CFrame.new(x, 1.4, room.CenterZ + 8),
+			COLORS.Metal,
+			Enum.Material.DiamondPlate
+		)
+		local button = createPart(
+			room.Model,
+			"RuneButton_" .. tostring(index),
+			Vector3.new(5, 1, 4.6),
+			CFrame.new(x, 2.8, room.CenterZ + 8),
+			rune.Color,
+			Enum.Material.Neon
+		)
+		local geometryGroup = string.format("Console_%d_%d", room.Index, index)
+		markGeometry(base, GEOMETRY_ROLES.Console, geometryGroup)
+		markGeometry(button, GEOMETRY_ROLES.Console, geometryGroup)
+		addSurfaceText(base, rune.Name, Enum.NormalId.Front, rune.Color)
+		local prompt = makePrompt(button, "LINK", rune.Name .. " RUNE", self._config.Roles.Operator, "RuneButton")
+
+		self:_connect(prompt.Triggered, function(player)
+			if room.Busy or not self:_canUseConsole(player, room, prompt, "RuneButton") then
+				return
+			end
+			self:_interaction(player, room, "RuneButton")
+			room.Busy = true
+			local solved, advanceReason = RuneCircuitPuzzle.Advance(solution, state, index)
+			if advanceReason == "wrong" then
+				progressLabel.Text = "LINK 0 / " .. tostring(#solution.SequenceIndices)
+				self:_mistake(player, "Wrong rune. The circuit reset!", room)
+			else
+				progressLabel.Text = "LINK "
+					.. tostring(state.Progress - 1)
+					.. " / "
+					.. tostring(#solution.SequenceIndices)
+				if solved then
+					self:_completeRoom(room, player)
+				else
+					self:_status(
+						"Rune accepted: "
+							.. tostring(state.Progress - 1)
+							.. " / "
+							.. tostring(#solution.SequenceIndices)
+					)
+				end
+			end
+			task.delay(0.45, function()
+				room.Busy = false
+			end)
+		end)
+	end
+end
+
+function RoomGenerator:_buildFrequencyRoom(room, randomGenerator, difficulty)
 	room.DisplayName = "Frequency Vault"
 	self:_addRoomHeader(room, "FREQUENCY VAULT", "MATCH THE THREE HIDDEN CHANNELS", Color3.fromRGB(255, 177, 66))
 
-	local solution = FrequencyDialsPuzzle.GenerateSolution(randomGenerator, 1)
+	local solution = FrequencyDialsPuzzle.GenerateSolution(randomGenerator, difficulty)
 	local state = FrequencyDialsPuzzle.BuildInitialState(solution)
 	local targets = solution.Targets
 	local values = state.Values
@@ -510,12 +717,12 @@ function RoomGenerator:_buildFrequencyRoom(room, randomGenerator)
 	end
 end
 
-function RoomGenerator:_buildPowerGridRoom(room, randomGenerator)
+function RoomGenerator:_buildPowerGridRoom(room, randomGenerator, difficulty)
 	room.DisplayName = "Power Grid"
 	self:_addRoomHeader(room, "POWER GRID", "SWITCHES ALSO TOGGLE THEIR NEIGHBORS", Color3.fromRGB(94, 255, 151))
 
 	local nodeCount = 5
-	local solution = PowerGridPuzzle.GenerateSolution(randomGenerator, 1)
+	local solution = PowerGridPuzzle.GenerateSolution(randomGenerator, difficulty)
 	local state = PowerGridPuzzle.BuildInitialState(solution)
 	local target = solution.Target
 	local current = state.Current
@@ -708,13 +915,17 @@ function RoomGenerator:_decorateRoom(room)
 	light.Parent = projectorGlow
 end
 
-function RoomGenerator:_buildSignalRoom(room, randomGenerator)
+function RoomGenerator:_buildSignalRoom(room, randomGenerator, difficulty)
 	room.DisplayName = "Signal Chamber"
 	self:_addRoomHeader(room, "SIGNAL CHAMBER", "SEER READS • OPERATOR ACTIVATES", COLORS.Cyan)
 
-	local solution = SignalPuzzle.GenerateSolution(randomGenerator, 1)
+	local solution = SignalPuzzle.GenerateSolution(randomGenerator, difficulty)
 	local state = SignalPuzzle.BuildInitialState(solution)
-	local correct = self._config.Signals[solution.CorrectIndex]
+	local sequenceNames = table.create(#solution.SequenceIndices)
+	for position, signalIndex in ipairs(solution.SequenceIndices) do
+		sequenceNames[position] = signalLabel(self._config.Signals[signalIndex])
+	end
+	local firstSignal = self._config.Signals[solution.SequenceIndices[1]]
 	local beaconBase = createPart(
 		room.Model,
 		"SignalBase",
@@ -729,16 +940,16 @@ function RoomGenerator:_buildSignalRoom(room, randomGenerator)
 		"SignalBeacon",
 		Vector3.new(3, 3, 3),
 		CFrame.new(0, 3.1, room.CenterZ - 8),
-		correct.Color,
+		firstSignal.Color,
 		Enum.Material.Neon,
-		Enum.PartType.Ball
+		firstSignal.Shape or Enum.PartType.Ball
 	)
 	self:_addSeerClue(room, {
 		Id = "SignalReadout",
 		Kind = "Billboard",
 		AnchorName = "SignalBeacon",
-		Text = "SIGNAL: " .. correct.DisplayName,
-		Color = correct.Color,
+		Text = "SIGNAL: " .. table.concat(sequenceNames, "  >  "),
+		Color = firstSignal.Color,
 		Size = UDim2.fromOffset(300, 80),
 		Offset = Vector3.new(0, 4, 0),
 	})
@@ -765,11 +976,22 @@ function RoomGenerator:_buildSignalRoom(room, randomGenerator)
 		local geometryGroup = string.format("Console_%d_%d", room.Index, index)
 		markGeometry(base, GEOMETRY_ROLES.Console, geometryGroup)
 		markGeometry(button, GEOMETRY_ROLES.Console, geometryGroup)
-		addSurfaceText(base, signal.DisplayName, Enum.NormalId.Front, signal.Color)
+		local marker = createPart(
+			room.Model,
+			"SignalMarker_" .. signal.Id,
+			Vector3.new(1.8, 1.8, 1.8),
+			CFrame.new(x, 4.15, room.CenterZ + 8),
+			signal.Color,
+			Enum.Material.Neon
+		)
+		marker.Shape = signal.Shape or Enum.PartType.Block
+		marker.CanCollide = false
+		markGeometry(marker, GEOMETRY_ROLES.Console, geometryGroup)
+		addSurfaceText(base, signalLabel(signal), Enum.NormalId.Front, signal.Color)
 		local prompt = makePrompt(
 			button,
 			"ACTIVATE",
-			signal.DisplayName .. " CONSOLE",
+			signalLabel(signal) .. " CONSOLE",
 			self._config.Roles.Operator,
 			"SignalButton"
 		)
@@ -780,10 +1002,21 @@ function RoomGenerator:_buildSignalRoom(room, randomGenerator)
 			end
 			self:_interaction(player, room, "SignalButton")
 			room.Busy = true
-			state.SelectedIndex = index
-			if SignalPuzzle.Validate(solution, state) then
-				self:_completeRoom(room, player)
+			local expectedIndex = solution.SequenceIndices[state.Progress]
+			if index == expectedIndex then
+				state.Progress += 1
+				if SignalPuzzle.Validate(solution, state) then
+					self:_completeRoom(room, player)
+				else
+					self:_status(
+						"Signal accepted: "
+							.. tostring(state.Progress - 1)
+							.. " / "
+							.. tostring(#solution.SequenceIndices)
+					)
+				end
 			else
+				state.Progress = 1
 				self:_mistake(player, "Wrong signal in the Signal Chamber!", room)
 			end
 			task.delay(0.55, function()
@@ -793,7 +1026,7 @@ function RoomGenerator:_buildSignalRoom(room, randomGenerator)
 	end
 end
 
-function RoomGenerator:_buildPhaseFloorRoom(room, randomGenerator)
+function RoomGenerator:_buildPhaseFloorRoom(room, randomGenerator, difficulty)
 	room.DisplayName = "Invisible Floor"
 	self:_addRoomHeader(room, "INVISIBLE FLOOR", "THE SEER SEES THE SAFE PATH", COLORS.Violet)
 
@@ -835,11 +1068,37 @@ function RoomGenerator:_buildPhaseFloorRoom(room, randomGenerator)
 
 	local columns = 5
 	local rows = 5
-	local solution = PhaseFloorPuzzle.GenerateSolution(randomGenerator, 1)
-	local state = PhaseFloorPuzzle.BuildInitialState(solution)
+	local solution = PhaseFloorPuzzle.GenerateSolution(randomGenerator, difficulty)
 	local safeColumns = solution.SafeColumns
 
 	local touchDebounce = {}
+	local progressByPlayer = {}
+	local function getProgress(player)
+		local state = progressByPlayer[player]
+		if not state then
+			state = PhaseFloorPuzzle.BuildInitialState(solution)
+			progressByPlayer[player] = state
+		end
+		return state
+	end
+	local function resetProgress(player)
+		progressByPlayer[player] = PhaseFloorPuzzle.BuildInitialState(solution)
+	end
+	local function rejectPath(player, message)
+		if touchDebounce[player] then
+			return
+		end
+		touchDebounce[player] = true
+		resetProgress(player)
+		self:_mistake(player, message, room)
+		local character = player.Character
+		if character then
+			character:PivotTo(room.StartCFrame)
+		end
+		task.delay(1, function()
+			touchDebounce[player] = nil
+		end)
+	end
 	for row = 1, rows do
 		for column = 1, columns do
 			local x = (column - 3) * 5
@@ -866,44 +1125,64 @@ function RoomGenerator:_buildPhaseFloorRoom(room, randomGenerator)
 					COLORS.Cyan,
 					Enum.Material.Neon
 				)
+				self:_addSeerBillboard(
+					room,
+					tile,
+					"SafePathRow_" .. tostring(row),
+					"ROW " .. tostring(row),
+					Color3.fromRGB(245, 250, 255),
+					UDim2.fromOffset(110, 48),
+					Vector3.new(0, 2, 0)
+				)
 
-				if row == rows then
-					self:_connect(tile.Touched, function(hit)
-						local player = playerFromHit(hit)
-						if room.Active and self:_isParticipant(player) and self:_canOperate(player) then
-							state.CurrentRow = rows
-							if PhaseFloorPuzzle.Validate(solution, state) then
-								self:_completeRoom(room, player)
-							end
-						end
-					end)
-				end
+				self:_connect(tile.Touched, function(hit)
+					local player = playerFromHit(hit)
+					if
+						not room.Active
+						or not self:_isParticipant(player)
+						or not self:_canOperate(player)
+						or touchDebounce[player]
+					then
+						return
+					end
+					local state = getProgress(player)
+					local completed, advanceReason = PhaseFloorPuzzle.Advance(solution, state, row, column)
+					if advanceReason == "repeated" then
+						return
+					end
+					if advanceReason == "skipped" then
+						rejectPath(player, player.DisplayName .. " skipped a row on the invisible path!")
+						return
+					end
+					if completed then
+						self:_completeRoom(room, player)
+					else
+						self:_status("Invisible path progress: row " .. tostring(row) .. " / " .. tostring(rows))
+					end
+				end)
 			else
 				self:_connect(tile.Touched, function(hit)
 					local player = playerFromHit(hit)
-					if not room.Active or not self:_isParticipant(player) or touchDebounce[player] then
+					if
+						not room.Active
+						or not self:_isParticipant(player)
+						or not self:_canOperate(player)
+						or touchDebounce[player]
+					then
 						return
 					end
-					touchDebounce[player] = true
-					self:_mistake(player, player.DisplayName .. " stepped outside the invisible path!", room)
-					local character = player.Character
-					if character then
-						character:PivotTo(room.StartCFrame)
-					end
-					task.delay(1, function()
-						touchDebounce[player] = nil
-					end)
+					rejectPath(player, player.DisplayName .. " stepped outside the invisible path!")
 				end)
 			end
 		end
 	end
 end
 
-function RoomGenerator:_buildEchoSequenceRoom(room, randomGenerator)
+function RoomGenerator:_buildEchoSequenceRoom(room, randomGenerator, difficulty)
 	room.DisplayName = "Echo Sequence"
 	self:_addRoomHeader(room, "ECHO SEQUENCE", "MEMORIZE AND REPEAT THE ORDER", COLORS.Blue)
 
-	local solution = EchoSequencePuzzle.GenerateSolution(randomGenerator, 1)
+	local solution = EchoSequencePuzzle.GenerateSolution(randomGenerator, difficulty)
 	local state = EchoSequencePuzzle.BuildInitialState(solution)
 	local sequence = table.create(#solution.SequenceIndices)
 	for index, signalIndex in ipairs(solution.SequenceIndices) do
@@ -920,11 +1199,11 @@ function RoomGenerator:_buildEchoSequenceRoom(room, randomGenerator)
 	)
 	display.CanCollide = false
 	markRoomActive(display)
-	local sequenceText = sequence[1].DisplayName
-		.. "  >  "
-		.. sequence[2].DisplayName
-		.. "  >  "
-		.. sequence[3].DisplayName
+	local sequenceNames = table.create(#sequence)
+	for index, signal in ipairs(sequence) do
+		sequenceNames[index] = signalLabel(signal)
+	end
+	local sequenceText = table.concat(sequenceNames, "  >  ")
 	self:_addSeerBillboard(
 		room,
 		display,
@@ -934,6 +1213,9 @@ function RoomGenerator:_buildEchoSequenceRoom(room, randomGenerator)
 		UDim2.fromOffset(430, 88),
 		Vector3.new(0, 0, 0)
 	)
+	local progressLabel, progressGui =
+		addSurfaceText(display, "STEP 0 / " .. tostring(#sequence), Enum.NormalId.Front, Color3.fromRGB(190, 210, 255))
+	markRoomActive(progressGui)
 
 	room.SequenceProgress = state.Progress
 	for index, signal in ipairs(self._config.Signals) do
@@ -957,9 +1239,20 @@ function RoomGenerator:_buildEchoSequenceRoom(room, randomGenerator)
 		local geometryGroup = string.format("Console_%d_%d", room.Index, index)
 		markGeometry(base, GEOMETRY_ROLES.Console, geometryGroup)
 		markGeometry(button, GEOMETRY_ROLES.Console, geometryGroup)
-		addSurfaceText(base, signal.DisplayName, Enum.NormalId.Front, signal.Color)
+		local marker = createPart(
+			room.Model,
+			"EchoMarker_" .. signal.Id,
+			Vector3.new(1.8, 1.8, 1.8),
+			CFrame.new(x, 4.15, room.CenterZ + 8),
+			signal.Color,
+			Enum.Material.Neon
+		)
+		marker.Shape = signal.Shape or Enum.PartType.Block
+		marker.CanCollide = false
+		markGeometry(marker, GEOMETRY_ROLES.Console, geometryGroup)
+		addSurfaceText(base, signalLabel(signal), Enum.NormalId.Front, signal.Color)
 		local prompt =
-			makePrompt(button, "REPEAT", signal.DisplayName .. " ECHO", self._config.Roles.Operator, "EchoButton")
+			makePrompt(button, "REPEAT", signalLabel(signal) .. " ECHO", self._config.Roles.Operator, "EchoButton")
 
 		self:_connect(prompt.Triggered, function(player)
 			if room.Busy or not self:_canUseConsole(player, room, prompt, "EchoButton") then
@@ -971,6 +1264,7 @@ function RoomGenerator:_buildEchoSequenceRoom(room, randomGenerator)
 			if signal.Id == expected.Id then
 				state.Progress += 1
 				room.SequenceProgress = state.Progress
+				progressLabel.Text = "STEP " .. tostring(state.Progress - 1) .. " / " .. tostring(#sequence)
 				if EchoSequencePuzzle.Validate(solution, state) then
 					self:_completeRoom(room, player)
 				else
@@ -979,6 +1273,7 @@ function RoomGenerator:_buildEchoSequenceRoom(room, randomGenerator)
 			else
 				state.Progress = 1
 				room.SequenceProgress = state.Progress
+				progressLabel.Text = "STEP 0 / " .. tostring(#sequence)
 				self:_mistake(player, "Wrong echo. The sequence reset!", room)
 			end
 			task.delay(0.45, function()
@@ -1003,9 +1298,15 @@ function RoomGenerator:_buildGoal(parent)
 			return
 		end
 		local player = playerFromHit(hit)
-		if self:_isParticipant(player) and self._callbacks.OnFinished then
-			self._callbacks.OnFinished(player)
+		if not self:_isParticipant(player) or not self._callbacks.OnFinished then
+			return
 		end
+		local now = os.clock()
+		if now - (self._lastGoalTouch[player] or 0) < 0.5 then
+			return
+		end
+		self._lastGoalTouch[player] = now
+		self._callbacks.OnFinished(player)
 	end)
 	return goal
 end
@@ -1015,6 +1316,7 @@ function RoomGenerator:Generate(randomGenerator, roomCount, options)
 	randomGenerator = randomGenerator or Random.new()
 	options = options or {}
 	roomCount = math.clamp(roomCount or 3, 1, #ROOM_CENTERS)
+	local difficulty = Difficulty.Normalize(options.Difficulty or self._config.Round.Difficulty)
 
 	local folder = Instance.new("Folder")
 	folder.Name = "GeneratedRooms"
@@ -1042,21 +1344,27 @@ function RoomGenerator:Generate(randomGenerator, roomCount, options)
 			StartCFrame = CFrame.new(0, 4, ROOM_CENTERS[index] - 16),
 			Active = false,
 			Busy = false,
+			Difficulty = difficulty,
 		}
+		model:SetAttribute("Difficulty", difficulty)
 		room.Gate = self:_buildGate(model, index, ROOM_ENDS[index])
 		room.GateClosedCFrame = room.Gate.CFrame
 		table.insert(self._rooms, room)
 
 		if room.Preset == "Signal" then
-			self:_buildSignalRoom(room, randomGenerator)
+			self:_buildSignalRoom(room, randomGenerator, difficulty)
 		elseif room.Preset == "PhaseFloor" then
-			self:_buildPhaseFloorRoom(room, randomGenerator)
+			self:_buildPhaseFloorRoom(room, randomGenerator, difficulty)
 		elseif room.Preset == "EchoSequence" then
-			self:_buildEchoSequenceRoom(room, randomGenerator)
+			self:_buildEchoSequenceRoom(room, randomGenerator, difficulty)
 		elseif room.Preset == "FrequencyDials" then
-			self:_buildFrequencyRoom(room, randomGenerator)
+			self:_buildFrequencyRoom(room, randomGenerator, difficulty)
+		elseif room.Preset == "PowerGrid" then
+			self:_buildPowerGridRoom(room, randomGenerator, difficulty)
+		elseif room.Preset == "MirrorRelay" then
+			self:_buildMirrorRelayRoom(room, randomGenerator, difficulty)
 		else
-			self:_buildPowerGridRoom(room, randomGenerator)
+			self:_buildRuneCircuitRoom(room, randomGenerator, difficulty)
 		end
 		self:_decorateRoom(room)
 	end
@@ -1066,6 +1374,7 @@ function RoomGenerator:Generate(randomGenerator, roomCount, options)
 	folder:SetAttribute("SeedId", options.SeedId)
 	folder:SetAttribute("BuildVersion", options.BuildVersion)
 	folder:SetAttribute("Environment", options.Environment)
+	folder:SetAttribute("Difficulty", difficulty)
 	self._currentRoomIndex = 0
 	self._goalUnlocked = false
 	self._active = false
@@ -1080,6 +1389,10 @@ function RoomGenerator:Validate()
 	if not self._goal or self._goal.Parent ~= self._folder then
 		table.insert(issues, "extraction pad is missing")
 	end
+	local generatedDifficulty = self._folder and self._folder:GetAttribute("Difficulty")
+	if not Difficulty.IsValid(generatedDifficulty) then
+		table.insert(issues, "generated difficulty is missing or invalid")
+	end
 
 	local seenPresets = {}
 	for index, room in ipairs(self._rooms) do
@@ -1091,6 +1404,9 @@ function RoomGenerator:Validate()
 		end
 		if not room.Gate or room.Gate.Parent ~= room.Model then
 			table.insert(issues, "gate missing at " .. tostring(index))
+		end
+		if room.Difficulty ~= generatedDifficulty or room.Model:GetAttribute("Difficulty") ~= generatedDifficulty then
+			table.insert(issues, "difficulty mismatch at " .. tostring(index))
 		end
 		local deck = self._mapRoot:FindFirstChild("ChamberDeck_" .. tostring(index))
 		if not deck or not deck:IsA("BasePart") then
@@ -1196,12 +1512,23 @@ function RoomGenerator:GetStartCFrame(roomIndex)
 	return if room then room.StartCFrame else self._spawnPart.CFrame
 end
 
+function RoomGenerator:GetExtractionState()
+	return {
+		Active = self._active,
+		GoalUnlocked = self._goalUnlocked,
+		GoalPosition = if self._goal then self._goal.Position else nil,
+		RoomCount = #self._rooms,
+		CurrentRoomIndex = self._currentRoomIndex,
+	}
+end
+
 function RoomGenerator:Start(startRoomIndex)
 	if #self._rooms == 0 then
 		return
 	end
 	self._active = true
 	self._goalUnlocked = false
+	table.clear(self._lastGoalTouch)
 	self._currentRoomIndex = math.clamp(startRoomIndex or 1, 1, #self._rooms)
 	for _, room in ipairs(self._rooms) do
 		if room.Index < self._currentRoomIndex then
@@ -1241,6 +1568,7 @@ function RoomGenerator:DestroyGenerated()
 	table.clear(self._connections)
 	table.clear(self._rooms)
 	table.clear(self._lastConsoleInteraction)
+	table.clear(self._lastGoalTouch)
 	if self._folder then
 		self._folder:Destroy()
 		self._folder = nil

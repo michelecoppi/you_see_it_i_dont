@@ -12,6 +12,7 @@ local PlayerDataService = require(script:WaitForChild("PlayerDataService"))
 local QAService = require(script:WaitForChild("QAService"))
 local RemoteGuard = require(script:WaitForChild("RemoteGuard"))
 local RoomGenerator = require(script:WaitForChild("RoomGenerator"))
+local RoundCompletionValidator = require(script:WaitForChild("RoundCompletionValidator"))
 local RoundDebugService = require(script:WaitForChild("RoundDebugService"))
 local SoloDrone = require(script:WaitForChild("SoloDrone"))
 local TelemetryService = require(script:WaitForChild("TelemetryService"))
@@ -88,6 +89,7 @@ local currentMatchMode = "Solo"
 local currentPresetOrder = {}
 local currentRoundSeed = SeedUtil.Default
 local currentRoundSeedId = SeedUtil.Identifier(currentRoundSeed)
+local currentDifficulty = Config.Round.Difficulty
 local currentStartRoom = 1
 local currentRoomIndex = 0
 local currentSpawnCFrame = map.Spawn.CFrame
@@ -202,9 +204,11 @@ local function sendRoundSnapshot(player)
 		environment = Config.EnvironmentName,
 		seedId = currentRoundSeedId,
 		qaEnabled = qa.Enabled,
+		difficulty = currentDifficulty,
 		qaPreset = currentPresetOrder[currentRoomIndex],
 		qaRoom = currentRoomIndex,
 		qaStartRoom = currentStartRoom,
+		qaDifficulty = currentDifficulty,
 		roomIndex = currentRoomIndex,
 		seerClues = if canReceiveSeerClues and roomGenerator then roomGenerator:GetSeerClues() else nil,
 		visionEndsAt = if visionActive then visionEndsAt[player] else 0,
@@ -611,9 +615,35 @@ roomGenerator = RoomGenerator.new(map.Root, map.Spawn, Config, {
 		end
 	end,
 	OnFinished = function(player)
-		if phase == "Playing" and isParticipant(player) then
-			resolveRound(player.DisplayName .. " stabilized the expedition!", true)
+		local extractionState = roomGenerator:GetExtractionState()
+		local character = player.Character
+		local rootPart = if character then character:FindFirstChild("HumanoidRootPart") else nil
+		local expectedRoomCount = math.max(1, #currentPresetOrder - currentStartRoom + 1)
+		local elapsed = if roundStartedAt > 0 then math.max(0, os.clock() - roundStartedAt) else 0
+		local valid, reason = RoundCompletionValidator.Validate({
+			Phase = phase,
+			IsParticipant = isParticipant(player),
+			GeneratorActive = extractionState.Active,
+			GoalUnlocked = extractionState.GoalUnlocked,
+			CompletedRoomCount = #roundRoomTimings,
+			ExpectedRoomCount = expectedRoomCount,
+			ElapsedSeconds = elapsed,
+			MinimumElapsedSeconds = (Config.Security.MinimumCompletionSecondsPerRoom or 2) * expectedRoomCount,
+			PlayerPosition = if rootPart and rootPart:IsA("BasePart") then rootPart.Position else nil,
+			GoalPosition = extractionState.GoalPosition,
+			MaximumGoalDistance = Config.Security.ExtractionMaximumDistance or 14,
+		})
+		if not valid then
+			roundDebug:Log("ExtractionRejected", {
+				completedRooms = #roundRoomTimings,
+				elapsed = string.format("%.2f", elapsed),
+				expectedRooms = expectedRoomCount,
+				reason = reason,
+				userId = player.UserId,
+			})
+			return
 		end
+		resolveRound(player.DisplayName .. " stabilized the expedition!", true)
 	end,
 })
 
@@ -1231,11 +1261,13 @@ local function runMatch()
 	currentRoundSeed = SeedUtil.Normalize(currentRoundSeed)
 	currentRoundSeedId = SeedUtil.Identifier(currentRoundSeed)
 	local generationOptions = qa:GetGenerationOptions() or {}
+	generationOptions.Difficulty = generationOptions.Difficulty or Config.Round.Difficulty
 	generationOptions.Seed = currentRoundSeed
 	generationOptions.SeedId = currentRoundSeedId
 	generationOptions.BuildVersion = Config.Build.DisplayVersion
 	generationOptions.Environment = Config.EnvironmentName
 	currentStartRoom = generationOptions.StartRoomIndex or 1
+	currentDifficulty = generationOptions.Difficulty
 	currentRoomIndex = currentStartRoom
 	currentPresetOrder = roomGenerator:Generate(Random.new(currentRoundSeed), roomCount, generationOptions)
 	local generationValid, generationIssues = roomGenerator:Validate()
@@ -1272,12 +1304,11 @@ local function runMatch()
 	teleportParticipantsToStart()
 	for _, player in ipairs(getParticipants()) do
 		playerData:RecordExpeditionStarted(player, currentMatchMode, currentPresetOrder)
-		telemetry:Log(
-			player,
-			"ExpeditionStarted",
-			1,
-			{ currentMatchMode, tostring(#currentPresetOrder) .. "Rooms", getRole(player) }
-		)
+		telemetry:Log(player, "ExpeditionStarted", 1, {
+			currentMatchMode,
+			tostring(#currentPresetOrder) .. "Rooms-" .. currentDifficulty,
+			getRole(player),
+		})
 		telemetry:Log(
 			player,
 			"ExpeditionSeed",
