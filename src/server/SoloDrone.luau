@@ -1,5 +1,6 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local Theme = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("VisualTheme"))
 
 local SoloDrone = {}
 SoloDrone.__index = SoloDrone
@@ -22,8 +23,8 @@ local function configurePart(part, name, size, color, material)
 end
 
 local function createDrone(player, parent, initialCFrame)
-	local primaryColor = player:GetAttribute("DronePrimaryColor") or Color3.fromRGB(55, 77, 98)
-	local accentColor = player:GetAttribute("DroneAccentColor") or Color3.fromRGB(74, 255, 222)
+	local primaryColor = player:GetAttribute("DronePrimaryColor") or Theme.Colors.White
+	local accentColor = player:GetAttribute("DroneAccentColor") or Theme.Colors.Cyan
 
 	local model = Instance.new("Model")
 	model.Name = "SoloDrone_" .. player.Name
@@ -34,17 +35,28 @@ local function createDrone(player, parent, initialCFrame)
 	body.Shape = Enum.PartType.Ball
 	body.Parent = model
 
+	local eyeSocket = configurePart(
+		Instance.new("Part"),
+		"EyeSocket",
+		Vector3.new(0.88, 0.88, 0.16),
+		Theme.Colors.Void,
+		Enum.Material.Metal
+	)
+	eyeSocket.Shape = Enum.PartType.Cylinder
+	eyeSocket.CFrame = CFrame.new(0, 0, 0.57) * CFrame.Angles(0, math.rad(90), 0)
+	eyeSocket.Parent = model
+
 	local core =
-		configurePart(Instance.new("Part"), "Core", Vector3.new(0.62, 0.62, 0.62), accentColor, Enum.Material.Neon)
+		configurePart(Instance.new("Part"), "Core", Vector3.new(0.38, 0.38, 0.38), accentColor, Enum.Material.Neon)
 	core.Shape = Enum.PartType.Ball
-	core.CFrame = CFrame.new(0, 0, 0.52)
+	core.CFrame = CFrame.new(0, 0, 0.7)
 	core.Parent = model
 
 	local ring = configurePart(
 		Instance.new("Part"),
 		"EnergyRing",
 		Vector3.new(0.12, 1.65, 1.65),
-		Color3.fromRGB(128, 94, 255),
+		Theme.Colors.Violet,
 		Enum.Material.Neon
 	)
 	ring.Shape = Enum.PartType.Cylinder
@@ -59,14 +71,49 @@ local function createDrone(player, parent, initialCFrame)
 		Color3.fromRGB(74, 255, 222),
 		Enum.Material.Neon
 	)
-	antenna.CFrame = CFrame.new(0, 0.82, 0)
+	antenna.CFrame = CFrame.new(0, 0.86, 0)
 	antenna.Parent = model
+
+	local beacon = configurePart(
+		Instance.new("Part"),
+		"AnomalyBeacon",
+		Vector3.new(0.28, 0.28, 0.28),
+		Theme.Colors.Violet,
+		Enum.Material.Neon
+	)
+	beacon.Shape = Enum.PartType.Ball
+	beacon.CFrame = CFrame.new(0, 1.18, 0)
+	beacon.Parent = model
+
+	for _, side in ipairs({ -1, 1 }) do
+		local module = configurePart(
+			Instance.new("Part"),
+			"SideModule",
+			Vector3.new(0.22, 0.62, 0.62),
+			primaryColor,
+			Enum.Material.Metal
+		)
+		module.Shape = Enum.PartType.Cylinder
+		module.CFrame = CFrame.new(side * 0.69, 0, 0)
+		module.Parent = model
+	end
+
+	local thruster = configurePart(
+		Instance.new("Part"),
+		"HoverThruster",
+		Vector3.new(0.32, 0.2, 0.32),
+		accentColor,
+		Enum.Material.Neon
+	)
+	thruster.Shape = Enum.PartType.Ball
+	thruster.CFrame = CFrame.new(0, -0.7, 0)
+	thruster.Parent = model
 
 	local light = Instance.new("PointLight")
 	light.Name = "AssistLight"
 	light.Color = core.Color
-	light.Brightness = 1.4
-	light.Range = 8
+	light.Brightness = 0.7
+	light.Range = 6
 	light.Shadows = false
 	light.Parent = core
 

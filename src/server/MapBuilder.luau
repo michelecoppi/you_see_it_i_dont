@@ -1,5 +1,6 @@
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
+local Theme = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("VisualTheme"))
 
 local MapBuilder = {}
 
@@ -21,6 +22,7 @@ local function createPart(parent, name, size, cframe, color, material)
 	part.Anchored = true
 	part.TopSurface = Enum.SurfaceType.Smooth
 	part.BottomSurface = Enum.SurfaceType.Smooth
+	part.CastShadow = material ~= Enum.Material.Neon
 	part.Parent = parent
 	return part
 end
@@ -32,19 +34,20 @@ local function addCornerLight(parent, position, color)
 
 	local light = Instance.new("PointLight")
 	light.Color = color
-	light.Brightness = 2
+	light.Brightness = 1.1
 	light.Range = 19
+	light.Shadows = false
 	light.Parent = fixture
 end
 
 local function configureLighting()
 	Lighting.ClockTime = 14
-	Lighting.Brightness = 3.2
-	Lighting.Ambient = Color3.fromRGB(92, 105, 139)
-	Lighting.OutdoorAmbient = Color3.fromRGB(67, 80, 110)
+	Lighting.Brightness = Theme.Lighting.Brightness
+	Lighting.Ambient = Theme.Lighting.Ambient
+	Lighting.OutdoorAmbient = Theme.Lighting.OutdoorAmbient
 	Lighting.EnvironmentDiffuseScale = 0.6
 	Lighting.EnvironmentSpecularScale = 0.8
-	Lighting.ExposureCompensation = 0.22
+	Lighting.ExposureCompensation = Theme.Lighting.Exposure
 
 	for _, effectName in ipairs({ "RealityAtmosphere", "RealityBloom", "RealityColor" }) do
 		local previousEffect = Lighting:FindFirstChild(effectName)
@@ -55,26 +58,26 @@ local function configureLighting()
 
 	local atmosphere = Instance.new("Atmosphere")
 	atmosphere.Name = "RealityAtmosphere"
-	atmosphere.Color = Color3.fromRGB(183, 208, 235)
-	atmosphere.Decay = Color3.fromRGB(86, 96, 132)
-	atmosphere.Density = 0.1
+	atmosphere.Color = Color3.fromRGB(154, 185, 207)
+	atmosphere.Decay = Theme.Colors.Steel
+	atmosphere.Density = 0.08
 	atmosphere.Glare = 0.05
 	atmosphere.Haze = 0.55
 	atmosphere.Parent = Lighting
 
 	local bloom = Instance.new("BloomEffect")
 	bloom.Name = "RealityBloom"
-	bloom.Intensity = 0.55
+	bloom.Intensity = Theme.Lighting.BloomIntensity
 	bloom.Size = 28
-	bloom.Threshold = 1.1
+	bloom.Threshold = Theme.Lighting.BloomThreshold
 	bloom.Parent = Lighting
 
 	local colorCorrection = Instance.new("ColorCorrectionEffect")
 	colorCorrection.Name = "RealityColor"
-	colorCorrection.Brightness = 0.08
+	colorCorrection.Brightness = 0.02
 	colorCorrection.Contrast = 0.08
-	colorCorrection.Saturation = 0.08
-	colorCorrection.TintColor = Color3.fromRGB(239, 246, 255)
+	colorCorrection.Saturation = 0.02
+	colorCorrection.TintColor = Theme.Colors.White
 	colorCorrection.Parent = Lighting
 end
 
@@ -207,9 +210,10 @@ local function buildLaboratoryDetails(map)
 			local surfaceLight = Instance.new("SurfaceLight")
 			surfaceLight.Face = Enum.NormalId.Bottom
 			surfaceLight.Angle = 80
-			surfaceLight.Brightness = 2.2
+			surfaceLight.Brightness = 1.1
 			surfaceLight.Range = 24
 			surfaceLight.Color = ceilingLight.Color
+			surfaceLight.Shadows = false
 			surfaceLight.Parent = ceilingLight
 		end
 	end
@@ -274,6 +278,22 @@ local function buildLaboratoryDetails(map)
 			)
 			lane.CanCollide = false
 		end
+		-- Short edge dashes make each chamber readable without implying a puzzle solution.
+		for _, side in ipairs({ -1, 1 }) do
+			for _, zOffset in ipairs({ -14, -7, 0, 7, 14 }) do
+				local dash = createPart(
+					map,
+					"ChamberRouteDash",
+					Vector3.new(1.4, 0.06, 0.24),
+					CFrame.new(side * 29, 0.72, centerZ + zOffset),
+					Theme.Colors.Cyan,
+					Enum.Material.Neon
+				)
+				dash.CanCollide = false
+				dash.CanTouch = false
+				dash.CanQuery = false
+			end
+		end
 
 		for _, side in ipairs({ -1, 1 }) do
 			local window = createPart(
@@ -309,6 +329,8 @@ local function buildLaboratoryDetails(map)
 			Enum.Material.Neon
 		)
 		archLight.CanCollide = false
+		archLight.CanTouch = false
+		archLight.CanQuery = false
 	end
 end
 

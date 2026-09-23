@@ -1,4 +1,5 @@
 local LobbyBuilder = {}
+local Theme = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("VisualTheme"))
 
 local LOBBY_NAME = "RealityLobby"
 local ORIGIN = Vector3.new(100, 0, 0)
@@ -15,6 +16,7 @@ local function createPart(parent, name, size, cframe, color, material)
 	part.Anchored = true
 	part.TopSurface = Enum.SurfaceType.Smooth
 	part.BottomSurface = Enum.SurfaceType.Smooth
+	part.CastShadow = material ~= Enum.Material.Neon
 	part.Parent = parent
 	return part
 end
@@ -117,6 +119,7 @@ local function addPortal(parent, name, center, color, title, subtitle, actionTex
 	light.Color = color
 	light.Brightness = 2
 	light.Range = 18
+	light.Shadows = false
 	light.Parent = portal
 
 	local particles = Instance.new("ParticleEmitter")
@@ -171,9 +174,9 @@ local function addPortal(parent, name, center, color, title, subtitle, actionTex
 end
 
 local function addLobbyArchitecture(root)
-	local cyan = Color3.fromRGB(88, 224, 196)
-	local blue = Color3.fromRGB(91, 120, 255)
-	local violet = Color3.fromRGB(177, 110, 255)
+	local cyan = Theme.Colors.Cyan
+	local blue = Theme.Colors.Blue
+	local violet = Theme.Colors.Violet
 
 	createPart(
 		root,
@@ -231,10 +234,39 @@ local function addLobbyArchitecture(root)
 		local light = Instance.new("SurfaceLight")
 		light.Face = Enum.NormalId.Bottom
 		light.Color = strip.Color
-		light.Brightness = 2.1
+		light.Brightness = 1.2
 		light.Range = 25
 		light.Angle = 95
+		light.Shadows = false
 		light.Parent = strip
+	end
+
+	-- Inlaid routes lead from spawn to both portals without blocking movement.
+	for _, side in ipairs({ -1, 1 }) do
+		local route = createPart(
+			root,
+			"PortalRoute",
+			Vector3.new(0.32, 0.08, 54),
+			CFrame.new(ORIGIN + Vector3.new(side * 17, 0.56, 2)),
+			if side < 0 then cyan else violet,
+			Enum.Material.Neon
+		)
+		route.CanCollide = false
+		route.CanTouch = false
+		route.CanQuery = false
+		for _, zOffset in ipairs({ -38, -24, -10, 4, 18, 32 }) do
+			local cross = createPart(
+				root,
+				"RouteMarker",
+				Vector3.new(3.5, 0.08, 0.28),
+				CFrame.new(ORIGIN + Vector3.new(side * 17, 0.56, zOffset)),
+				if side < 0 then cyan else violet,
+				Enum.Material.Neon
+			)
+			cross.CanCollide = false
+			cross.CanTouch = false
+			cross.CanQuery = false
+		end
 	end
 
 	for _, side in ipairs({ -1, 1 }) do

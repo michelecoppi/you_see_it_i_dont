@@ -7,11 +7,13 @@ local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
+local Theme = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("VisualTheme"))
 local QALog = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("QALog"))
 local roundStateRemote = ReplicatedStorage:WaitForChild("GameRemotes"):WaitForChild("RoundState")
 local lobbyEvent = ReplicatedStorage:WaitForChild("GameRemotes"):WaitForChild("LobbyEvent")
 local LobbyController = require(script:WaitForChild("LobbyController"))
 local SeerClueRenderer = require(script:WaitForChild("SeerClueRenderer"))
+local TutorialController = require(script:WaitForChild("TutorialController"))
 local playerGui = player:WaitForChild("PlayerGui")
 
 local currentRole = Config.Roles.Hybrid
@@ -23,13 +25,40 @@ local visionEndsAt = 0
 local hudDetailsVisible = false
 local qaLoggingEnabled = false
 
+local function updateLocalRoleOutline()
+	local character = player.Character
+	if not character then
+		return
+	end
+	local outline = character:FindFirstChild("LocalRoleOutline")
+	if currentPhase ~= "Playing" then
+		if outline then
+			outline:Destroy()
+		end
+		return
+	end
+	if not outline then
+		outline = Instance.new("Highlight")
+		outline.Name = "LocalRoleOutline"
+		outline.FillTransparency = 1
+		outline.OutlineTransparency = 0.5
+		outline.DepthMode = Enum.HighlightDepthMode.Occluded
+		outline.Parent = character
+	end
+	outline.OutlineColor = Config.RoleColors[currentRole] or Theme.Colors.Cyan
+end
+
+player.CharacterAdded:Connect(function()
+	task.defer(updateLocalRoleOutline)
+end)
+
 local function getServerTime()
 	return workspace:GetServerTimeNow()
 end
 
 local function addCorner(guiObject, radius)
 	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, radius or 12)
+	corner.CornerRadius = UDim.new(0, radius or Theme.UI.CornerRadius)
 	corner.Parent = guiObject
 	return corner
 end
@@ -37,7 +66,7 @@ end
 local function addStroke(guiObject, color, thickness, transparency)
 	local stroke = Instance.new("UIStroke")
 	stroke.Color = color
-	stroke.Thickness = thickness or 2
+	stroke.Thickness = thickness or Theme.UI.StrokeThickness
 	stroke.Transparency = transparency or 0
 	stroke.Parent = guiObject
 	return stroke
@@ -51,7 +80,7 @@ local function createLabel(parent, name, size, position, text, textSize)
 	label.BackgroundTransparency = 1
 	label.Font = Enum.Font.GothamBold
 	label.Text = text
-	label.TextColor3 = Color3.fromRGB(240, 243, 255)
+	label.TextColor3 = Theme.Colors.White
 	label.TextSize = textSize
 	label.TextWrapped = true
 	label.Parent = parent
@@ -71,7 +100,7 @@ topBar.Name = "TopBar"
 topBar.AnchorPoint = Vector2.new(0.5, 0)
 topBar.Position = UDim2.fromScale(0.5, 0.025)
 topBar.Size = UDim2.new(0.92, 0, 0, 74)
-topBar.BackgroundColor3 = Color3.fromRGB(14, 17, 28)
+topBar.BackgroundColor3 = Theme.Colors.Panel
 topBar.BackgroundTransparency = 0.08
 topBar.Visible = false
 topBar.Parent = screenGui
@@ -94,11 +123,11 @@ compactHud.Name = "CompactHud"
 compactHud.AnchorPoint = Vector2.new(1, 0)
 compactHud.Position = UDim2.fromScale(0.97, 0.025)
 compactHud.Size = UDim2.fromOffset(230, 52)
-compactHud.BackgroundColor3 = Color3.fromRGB(14, 17, 28)
+compactHud.BackgroundColor3 = Theme.Colors.Panel
 compactHud.BackgroundTransparency = 0.12
 compactHud.Parent = screenGui
 addCorner(compactHud, 14)
-addStroke(compactHud, Color3.fromRGB(91, 120, 255), 2, 0.3)
+addStroke(compactHud, Theme.Colors.Cyan, 2, 0.3)
 
 local compactPhaseLabel =
 	createLabel(compactHud, "Phase", UDim2.new(0.7, 0, 1, 0), UDim2.fromScale(0.05, 0), "CONNECTING", 14)
@@ -129,7 +158,7 @@ local roleCard = Instance.new("Frame")
 roleCard.Name = "RoleCard"
 roleCard.Position = UDim2.new(0.04, 0, 0.15, 0)
 roleCard.Size = UDim2.new(0, 320, 0, 132)
-roleCard.BackgroundColor3 = Color3.fromRGB(17, 21, 34)
+roleCard.BackgroundColor3 = Theme.Colors.Panel
 roleCard.BackgroundTransparency = 0.06
 roleCard.Visible = false
 roleCard.Parent = screenGui
@@ -162,12 +191,12 @@ statusCard.Name = "StatusCard"
 statusCard.AnchorPoint = Vector2.new(0.5, 1)
 statusCard.Position = UDim2.fromScale(0.5, 0.96)
 statusCard.Size = UDim2.new(0.82, 0, 0, 68)
-statusCard.BackgroundColor3 = Color3.fromRGB(14, 17, 28)
+statusCard.BackgroundColor3 = Theme.Colors.Panel
 statusCard.BackgroundTransparency = 0.06
 statusCard.Visible = false
 statusCard.Parent = screenGui
 addCorner(statusCard, 16)
-addStroke(statusCard, Color3.fromRGB(88, 224, 196), 2, 0.3)
+addStroke(statusCard, Theme.Colors.Cyan, 2, 0.3)
 
 local statusLabel = createLabel(
 	statusCard,
@@ -199,7 +228,7 @@ visionCard.Name = "VisionCard"
 visionCard.AnchorPoint = Vector2.new(1, 1)
 visionCard.Position = UDim2.fromScale(0.97, 0.94)
 visionCard.Size = UDim2.fromOffset(210, 62)
-visionCard.BackgroundColor3 = Color3.fromRGB(24, 18, 42)
+visionCard.BackgroundColor3 = Theme.Colors.Panel
 visionCard.BackgroundTransparency = 0.04
 visionCard.Visible = false
 visionCard.Parent = screenGui
@@ -250,6 +279,7 @@ overlayGradient.Parent = visionOverlay
 
 local lobbyController = LobbyController.new(Config, lobbyEvent, playerGui)
 local seerClueRenderer = SeerClueRenderer.new("PrototypeMap")
+local tutorialController = TutorialController.new(playerGui)
 
 ScriptContext.Error:Connect(function(message, stackTrace, sourceScript)
 	if qaLoggingEnabled then
@@ -491,6 +521,8 @@ roundStateRemote.OnClientEvent:Connect(function(state)
 
 	currentRole = nextRole
 	currentPhase = nextPhase
+	tutorialController:SetContext(nextPhase, nextRole)
+	updateLocalRoleOutline()
 	visionEndsAt = if typeof(state.visionEndsAt) == "number" then state.visionEndsAt else 0
 	visionReadyAt = if typeof(state.visionReadyAt) == "number" then state.visionReadyAt else 0
 	local nextVisionActive = currentRole == Config.Roles.Hybrid

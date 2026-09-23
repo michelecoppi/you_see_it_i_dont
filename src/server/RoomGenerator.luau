@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Theme = require(Shared:WaitForChild("VisualTheme"))
 local Puzzles = Shared:WaitForChild("Puzzles")
 local Difficulty = require(Shared:WaitForChild("Difficulty"))
 local PresetOrder = require(Shared:WaitForChild("PresetOrder"))
@@ -49,11 +50,11 @@ local FLOOR_OVERLAY_NAMES = {
 }
 
 local COLORS = {
-	Metal = Color3.fromRGB(76, 88, 116),
-	Dark = Color3.fromRGB(34, 43, 61),
-	Cyan = Color3.fromRGB(70, 225, 218),
-	Violet = Color3.fromRGB(177, 110, 255),
-	Blue = Color3.fromRGB(91, 120, 255),
+	Metal = Theme.Colors.SteelLight,
+	Dark = Theme.Colors.Panel,
+	Cyan = Theme.Colors.Cyan,
+	Violet = Theme.Colors.Violet,
+	Blue = Theme.Colors.Blue,
 }
 
 local function createPart(parent, name, size, cframe, color, material)
@@ -66,6 +67,7 @@ local function createPart(parent, name, size, cframe, color, material)
 	part.Anchored = true
 	part.TopSurface = Enum.SurfaceType.Smooth
 	part.BottomSurface = Enum.SurfaceType.Smooth
+	part.CastShadow = material ~= Enum.Material.Neon
 	part.Parent = parent
 	return part
 end
@@ -684,6 +686,17 @@ function RoomGenerator:_buildFrequencyRoom(room, randomGenerator, difficulty)
 			Color3.fromRGB(255, 177, 66),
 			Enum.Material.Neon
 		)
+		local channelMark = createPart(
+			room.Model,
+			"ChannelMark_" .. tostring(index),
+			Vector3.new(6, 0.1, 0.35),
+			CFrame.new(x, 0.82, room.CenterZ + 3),
+			Color3.fromRGB(255, 151, 53),
+			Enum.Material.Neon
+		)
+		channelMark.CanCollide = false
+		channelMark.CanTouch = false
+		channelMark.CanQuery = false
 		dial.Shape = Enum.PartType.Cylinder
 		dial.Orientation = Vector3.new(0, 0, 90)
 		local geometryGroup = string.format("Console_%d_%d", room.Index, index)
@@ -751,6 +764,20 @@ function RoomGenerator:_buildPowerGridRoom(room, randomGenerator, difficulty)
 	)
 
 	local indicators = {}
+	for index = 1, nodeCount - 1 do
+		local x = (2.5 - index) * 6
+		local conduit = createPart(
+			room.Model,
+			"GridConduit_" .. tostring(index),
+			Vector3.new(2.1, 0.09, 0.22),
+			CFrame.new(x, 0.84, room.CenterZ + 8),
+			COLORS.Cyan,
+			Enum.Material.Neon
+		)
+		conduit.CanCollide = false
+		conduit.CanTouch = false
+		conduit.CanQuery = false
+	end
 	local function refreshIndicators()
 		for index, indicator in ipairs(indicators) do
 			indicator.Color = if current[index] then Color3.fromRGB(94, 255, 151) else Color3.fromRGB(64, 72, 91)
@@ -834,6 +861,25 @@ end
 
 function RoomGenerator:_decorateRoom(room)
 	local color = getPresetColor(room.Preset)
+	local motif = if room.Preset == "PhaseFloor"
+		then "PATH / MEMORY"
+		elseif room.Preset == "Signal" then "SIGNAL / RECALL"
+		elseif room.Preset == "EchoSequence" then "ECHO / REPEAT"
+		elseif room.Preset == "FrequencyDials" then "FREQUENCY / TUNE"
+		elseif room.Preset == "PowerGrid" then "POWER / ROUTE"
+		else "ANOMALY / SOLVE"
+	local motifPanel = createPart(
+		room.Model,
+		"RoomMotif",
+		Vector3.new(0.25, 2.3, 10),
+		CFrame.new(33.65, 12.5, room.CenterZ - 7),
+		COLORS.Dark,
+		Enum.Material.SmoothPlastic
+	)
+	motifPanel.CanCollide = false
+	local _, motifGui = addSurfaceText(motifPanel, motif, Enum.NormalId.Left, color)
+	markRoomActive(motifPanel)
+	markRoomActive(motifGui)
 	for _, side in ipairs({ -1, 1 }) do
 		for _, zOffset in ipairs({ -14, 14 }) do
 			local pylon = createPart(
@@ -910,8 +956,9 @@ function RoomGenerator:_decorateRoom(room)
 	projectorGlow.CanCollide = false
 	local light = Instance.new("PointLight")
 	light.Color = color
-	light.Brightness = 2.1
+	light.Brightness = 1.2
 	light.Range = 22
+	light.Shadows = false
 	light.Parent = projectorGlow
 end
 
@@ -934,6 +981,15 @@ function RoomGenerator:_buildSignalRoom(room, randomGenerator, difficulty)
 		COLORS.Metal,
 		Enum.Material.Metal
 	)
+	local beaconRim = createPart(
+		room.Model,
+		"SignalBeaconRim",
+		Vector3.new(6.2, 0.18, 6.2),
+		CFrame.new(0, 1.58, room.CenterZ - 8),
+		COLORS.Cyan,
+		Enum.Material.Neon
+	)
+	beaconRim.CanCollide = false
 	self:_addSeerPart(
 		room,
 		"SignalBeacon",
@@ -973,6 +1029,15 @@ function RoomGenerator:_buildSignalRoom(room, randomGenerator, difficulty)
 			signal.Color,
 			Enum.Material.Neon
 		)
+		local socket = createPart(
+			room.Model,
+			"SignalSocket_" .. signal.Id,
+			Vector3.new(6.3, 0.16, 6.3),
+			CFrame.new(x, 2.32, room.CenterZ + 8),
+			COLORS.Dark,
+			Enum.Material.Metal
+		)
+		socket.CanCollide = false
 		local geometryGroup = string.format("Console_%d_%d", room.Index, index)
 		markGeometry(base, GEOMETRY_ROLES.Console, geometryGroup)
 		markGeometry(button, GEOMETRY_ROLES.Console, geometryGroup)
@@ -1042,6 +1107,17 @@ function RoomGenerator:_buildPhaseFloorRoom(room, randomGenerator, difficulty)
 		rail.Transparency = 0.3
 		rail.CanCollide = true
 		markGeometry(rail, GEOMETRY_ROLES.Blocker)
+		local edgeLight = createPart(
+			room.Model,
+			"PhaseEdgeLight",
+			Vector3.new(0.18, 0.18, 31),
+			CFrame.new(side * 13.9, 1.02, room.CenterZ),
+			COLORS.Violet,
+			Enum.Material.Neon
+		)
+		edgeLight.CanCollide = false
+		edgeLight.CanTouch = false
+		edgeLight.CanQuery = false
 
 		local entryWing = createPart(
 			room.Model,
@@ -1236,6 +1312,15 @@ function RoomGenerator:_buildEchoSequenceRoom(room, randomGenerator, difficulty)
 			signal.Color,
 			Enum.Material.Neon
 		)
+		local echoRim = createPart(
+			room.Model,
+			"EchoPadRim_" .. signal.Id,
+			Vector3.new(7.4, 0.12, 7.4),
+			CFrame.new(x, 2.36, room.CenterZ + 8),
+			signal.Color,
+			Enum.Material.Neon
+		)
+		echoRim.CanCollide = false
 		local geometryGroup = string.format("Console_%d_%d", room.Index, index)
 		markGeometry(base, GEOMETRY_ROLES.Console, geometryGroup)
 		markGeometry(button, GEOMETRY_ROLES.Console, geometryGroup)
@@ -1284,6 +1369,15 @@ function RoomGenerator:_buildEchoSequenceRoom(room, randomGenerator, difficulty)
 end
 
 function RoomGenerator:_buildGoal(parent)
+	local plinth = createPart(
+		parent,
+		"ExtractionPlinth",
+		Vector3.new(18, 0.35, 16),
+		CFrame.new(0, 0.66, 71),
+		COLORS.Metal,
+		Enum.Material.Metal
+	)
+	plinth.CanCollide = false
 	local goal = createPart(
 		parent,
 		"ExtractionPad",
@@ -1292,6 +1386,19 @@ function RoomGenerator:_buildGoal(parent)
 		COLORS.Cyan,
 		Enum.Material.Neon
 	)
+	for _, side in ipairs({ -1, 1 }) do
+		local rail = createPart(
+			parent,
+			"ExtractionRail",
+			Vector3.new(0.2, 0.1, 16),
+			CFrame.new(side * 8.4, 0.9, 71),
+			COLORS.Cyan,
+			Enum.Material.Neon
+		)
+		rail.CanCollide = false
+		rail.CanTouch = false
+		rail.CanQuery = false
+	end
 	addSurfaceText(goal, "EXTRACTION", Enum.NormalId.Top, Color3.fromRGB(235, 255, 252))
 	self:_connect(goal.Touched, function(hit)
 		if not self._active or not self._goalUnlocked then

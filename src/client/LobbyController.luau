@@ -1,11 +1,15 @@
 local MarketplaceService = game:GetService("MarketplaceService")
+local GuiService = game:GetService("GuiService")
+local ContextActionService = game:GetService("ContextActionService")
+local UserInputService = game:GetService("UserInputService")
+local Theme = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("VisualTheme"))
 
 local LobbyController = {}
 LobbyController.__index = LobbyController
 
 local function addCorner(guiObject, radius)
 	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, radius or 12)
+	corner.CornerRadius = UDim.new(0, radius or Theme.UI.CornerRadius)
 	corner.Parent = guiObject
 	return corner
 end
@@ -13,7 +17,7 @@ end
 local function addStroke(guiObject, color, thickness, transparency)
 	local stroke = Instance.new("UIStroke")
 	stroke.Color = color
-	stroke.Thickness = thickness or 2
+	stroke.Thickness = thickness or Theme.UI.StrokeThickness
 	stroke.Transparency = transparency or 0
 	stroke.Parent = guiObject
 	return stroke
@@ -27,7 +31,7 @@ local function createLabel(parent, name, size, position, text, textSize)
 	label.BackgroundTransparency = 1
 	label.Font = Enum.Font.GothamBold
 	label.Text = text
-	label.TextColor3 = Color3.fromRGB(238, 242, 255)
+	label.TextColor3 = Theme.Colors.White
 	label.TextSize = textSize or 16
 	label.TextWrapped = true
 	label.Parent = parent
@@ -43,7 +47,7 @@ local function createButton(parent, name, size, position, text, color)
 	button.BackgroundColor3 = color
 	button.Font = Enum.Font.GothamBold
 	button.Text = text
-	button.TextColor3 = Color3.fromRGB(248, 250, 255)
+	button.TextColor3 = Theme.Colors.White
 	button.TextSize = 17
 	button.TextWrapped = true
 	button.Parent = parent
@@ -98,10 +102,12 @@ function LobbyController.new(config, remote, playerGui)
 	self._catalogMode = "Shop"
 	self._statsOpen = false
 	self._noticeGeneration = 0
+	self._modalFocus = nil
 
 	local screenGui = Instance.new("ScreenGui")
 	screenGui.Name = "LobbyHUD"
 	screenGui.IgnoreGuiInset = false
+	screenGui.DisplayOrder = 1
 	screenGui.ResetOnSpawn = false
 	screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	screenGui.Parent = playerGui
@@ -112,11 +118,11 @@ function LobbyController.new(config, remote, playerGui)
 	shardBadge.AnchorPoint = Vector2.new(1, 0)
 	shardBadge.Position = UDim2.fromScale(0.97, 0.025)
 	shardBadge.Size = UDim2.fromOffset(230, 56)
-	shardBadge.BackgroundColor3 = Color3.fromRGB(21, 26, 42)
+	shardBadge.BackgroundColor3 = Theme.Colors.Panel
 	shardBadge.BackgroundTransparency = 0.04
 	shardBadge.Parent = screenGui
 	addCorner(shardBadge, 16)
-	addStroke(shardBadge, Color3.fromRGB(177, 110, 255), 2, 0.15)
+	addStroke(shardBadge, Theme.Colors.Violet, 2, 0.15)
 
 	local shardLabel =
 		createLabel(shardBadge, "Amount", UDim2.new(0.92, 0, 1, 0), UDim2.fromScale(0.04, 0), "-- REALITY SHARDS", 17)
@@ -161,7 +167,7 @@ function LobbyController.new(config, remote, playerGui)
 	mainPanel.AnchorPoint = Vector2.new(0, 1)
 	mainPanel.Position = UDim2.new(0.035, 0, 0.96, 0)
 	mainPanel.Size = UDim2.new(0.78, 0, 0, 112)
-	mainPanel.BackgroundColor3 = Color3.fromRGB(14, 18, 30)
+	mainPanel.BackgroundColor3 = Theme.Colors.Panel
 	mainPanel.BackgroundTransparency = 0.04
 	mainPanel.Visible = false
 	mainPanel.Parent = screenGui
@@ -261,16 +267,16 @@ function LobbyController.new(config, remote, playerGui)
 	shopModal.AnchorPoint = Vector2.new(0.5, 0.5)
 	shopModal.Position = UDim2.fromScale(0.5, 0.52)
 	shopModal.Size = UDim2.new(0.9, 0, 0.84, 0)
-	shopModal.BackgroundColor3 = Color3.fromRGB(12, 15, 26)
+	shopModal.BackgroundColor3 = Theme.Colors.Void
 	shopModal.BackgroundTransparency = 0.015
 	shopModal.Visible = false
 	shopModal.ZIndex = 10
 	shopModal.Parent = screenGui
 	addCorner(shopModal, 20)
-	addStroke(shopModal, Color3.fromRGB(177, 110, 255), 3, 0.1)
+	addStroke(shopModal, Theme.Colors.Violet, 2, 0.1)
 
 	local shopConstraint = Instance.new("UISizeConstraint")
-	shopConstraint.MinSize = Vector2.new(320, 420)
+	shopConstraint.MinSize = Vector2.new(280, 280)
 	shopConstraint.MaxSize = Vector2.new(1080, 720)
 	shopConstraint.Parent = shopModal
 
@@ -332,24 +338,27 @@ function LobbyController.new(config, remote, playerGui)
 
 	self._shopModal = shopModal
 	self._catalog = catalog
+	self._shopConstraint = shopConstraint
+	self._catalogGrid = grid
 
 	local statsModal = Instance.new("Frame")
 	statsModal.Name = "StatsModal"
 	statsModal.AnchorPoint = Vector2.new(0.5, 0.5)
 	statsModal.Position = UDim2.fromScale(0.5, 0.52)
 	statsModal.Size = UDim2.new(0.86, 0, 0.82, 0)
-	statsModal.BackgroundColor3 = Color3.fromRGB(11, 18, 29)
+	statsModal.BackgroundColor3 = Theme.Colors.Void
 	statsModal.BackgroundTransparency = 0.01
 	statsModal.Visible = false
 	statsModal.ZIndex = 10
 	statsModal.Parent = screenGui
 	addCorner(statsModal, 20)
-	addStroke(statsModal, Color3.fromRGB(70, 225, 218), 3, 0.1)
+	addStroke(statsModal, Theme.Colors.Cyan, 2, 0.1)
 
 	local statsConstraint = Instance.new("UISizeConstraint")
-	statsConstraint.MinSize = Vector2.new(320, 410)
+	statsConstraint.MinSize = Vector2.new(280, 280)
 	statsConstraint.MaxSize = Vector2.new(920, 720)
 	statsConstraint.Parent = statsModal
+	self._statsConstraint = statsConstraint
 
 	local statsTitle = createLabel(
 		statsModal,
@@ -410,6 +419,57 @@ function LobbyController.new(config, remote, playerGui)
 
 	self._statsModal = statsModal
 	self._statsContent = statsContent
+	self._shopClose = closeShop
+	self._statsClose = closeStats
+
+	for _, button in ipairs({ soloButton, groupButton, shopButton, cancelButton, closeShop, closeStats }) do
+		button.Selectable = true
+	end
+	local function updateResponsiveLayout()
+		local camera = workspace.CurrentCamera
+		if not camera then
+			return
+		end
+		local viewport = camera.ViewportSize
+		local compact = viewport.X < 640
+		local modalWidth = math.max(260, math.min(viewport.X - 24, 1080))
+		local modalHeight = math.max(260, math.min(viewport.Y - 24, 720))
+		shopModal.Size = UDim2.fromOffset(modalWidth, modalHeight)
+		statsModal.Size = UDim2.fromOffset(math.min(modalWidth, 920), modalHeight)
+		shopConstraint.MinSize = Vector2.new(0, 0)
+		statsConstraint.MinSize = Vector2.new(0, 0)
+		grid.FillDirectionMaxCells = if compact then 1 else 2
+		grid.CellSize = if compact then UDim2.new(0.96, -8, 0, 178) else UDim2.new(0.48, -8, 0, 178)
+		shopTitle.TextSize = if compact then 20 else 27
+		statsTitle.TextSize = if compact then 20 else 27
+		shopTitle.Size = UDim2.new(if compact then 0.58 else 0.7, 0, 0, 48)
+		statsTitle.Size = UDim2.new(if compact then 0.58 else 0.72, 0, 0, 48)
+		closeShop.Size = UDim2.fromOffset(if compact then 84 else 112, 44)
+		closeShop.Position = UDim2.new(1, if compact then -96 else -132, 0, 16)
+		closeStats.Size = UDim2.fromOffset(if compact then 84 else 112, 44)
+		closeStats.Position = UDim2.new(1, if compact then -96 else -132, 0, 16)
+		self._mainPanel.Size = UDim2.new(if compact then 0.94 else 0.78, 0, 0, compact and 120 or 112)
+		self._mainPanel.Position = UDim2.new(compact and 0.03 or 0.035, 0, 0.96, 0)
+		panelConstraint.MinSize = Vector2.new(0, 112)
+		self._actionTray.Size = UDim2.fromOffset(compact and 252 or 300, 52)
+		self._actionTray.Position = UDim2.new(1, -12, 0.105, 0)
+		self._shardLabel.TextSize = if compact then 13 else 17
+		self._notice.Size = UDim2.new(if compact then 0.9 else 0.62, 0, 0, 54)
+		self._notice.Position = UDim2.new(if compact then 0.05 else 0.19, 0, 0.03, 0)
+	end
+	local cameraConnection
+	local function watchCamera()
+		if cameraConnection then
+			cameraConnection:Disconnect()
+		end
+		local camera = workspace.CurrentCamera
+		if camera then
+			cameraConnection = camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateResponsiveLayout)
+		end
+		updateResponsiveLayout()
+	end
+	workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(watchCamera)
+	watchCamera()
 
 	soloButton.Activated:Connect(function()
 		remote:FireServer({ action = "Solo" })
@@ -457,6 +517,33 @@ function LobbyController:_showNotice(message, isError)
 			self._notice.Visible = false
 		end
 	end)
+end
+
+function LobbyController:_focusModal(closeButton)
+	self._modalFocus = closeButton
+	local lastInput = UserInputService:GetLastInputType()
+	if GuiService:IsTenFootInterface() or string.find(lastInput.Name, "Gamepad") then
+		GuiService.SelectedObject = closeButton
+	end
+	ContextActionService:BindAction("LobbyModalBack", function(_, inputState)
+		if inputState == Enum.UserInputState.Begin then
+			if self._shopOpen then
+				self:CloseShop()
+			elseif self._statsOpen then
+				self:CloseStats()
+			end
+			return Enum.ContextActionResult.Sink
+		end
+		return Enum.ContextActionResult.Pass
+	end, false, Enum.KeyCode.ButtonB, Enum.KeyCode.Escape, Enum.KeyCode.Backspace)
+end
+
+function LobbyController:_releaseModalFocus()
+	ContextActionService:UnbindAction("LobbyModalBack")
+	self._modalFocus = nil
+	if GuiService.SelectedObject and GuiService.SelectedObject:IsDescendantOf(self._screenGui) then
+		GuiService.SelectedObject = nil
+	end
 end
 
 function LobbyController:_clearCatalog()
@@ -906,6 +993,7 @@ function LobbyController:OpenShop()
 	self._shopModal.Visible = true
 	self._mainPanel.Visible = false
 	self._actionTray.Visible = false
+	self:_focusModal(self._shopClose)
 	self:_renderShop()
 end
 
@@ -917,6 +1005,7 @@ function LobbyController:OpenWardrobe()
 	self._shopModal.Visible = true
 	self._mainPanel.Visible = false
 	self._actionTray.Visible = false
+	self:_focusModal(self._shopClose)
 	self:_renderShop()
 end
 
@@ -927,18 +1016,25 @@ function LobbyController:OpenStats()
 	self._statsModal.Visible = true
 	self._mainPanel.Visible = false
 	self._actionTray.Visible = false
+	self:_focusModal(self._statsClose)
 	self:_renderStats()
 end
 
 function LobbyController:CloseStats()
 	self._statsOpen = false
 	self._statsModal.Visible = false
+	if not self._shopOpen then
+		self:_releaseModalFocus()
+	end
 	self:_renderState()
 end
 
 function LobbyController:CloseShop()
 	self._shopOpen = false
 	self._shopModal.Visible = false
+	if not self._statsOpen then
+		self:_releaseModalFocus()
+	end
 	self:_renderState()
 end
 

@@ -124,10 +124,11 @@ Config.Signals = {
 	},
 }
 
+local VisualTheme = require(script.Parent.VisualTheme)
 Config.RoleColors = {
-	[Config.Roles.Seer] = Color3.fromRGB(177, 110, 255),
-	[Config.Roles.Operator] = Color3.fromRGB(255, 177, 66),
-	[Config.Roles.Hybrid] = Color3.fromRGB(88, 224, 196),
+	[Config.Roles.Seer] = VisualTheme.Colors.Violet,
+	[Config.Roles.Operator] = VisualTheme.Colors.Cyan,
+	[Config.Roles.Hybrid] = VisualTheme.Colors.Blue,
 }
 
 Config.Economy = {
@@ -144,13 +145,18 @@ Config.Economy = {
 
 Config.CosmeticOrder = {
 	"drone_default",
+	"title_first_light",
 	"drone_mint",
+	"vision_amber",
 	"drone_sunset",
 	"trail_cyan",
+	"title_signalkeeper",
 	"trail_violet",
 	"vision_cyan",
 	"vision_sunset",
 	"title_pathfinder",
+	"drone_aurora",
+	"trail_starlight",
 	"drone_void",
 	"vision_prismatic",
 }
@@ -163,6 +169,14 @@ Config.Cosmetics = {
 		Currency = "Starter",
 		PrimaryColor = Color3.fromRGB(55, 77, 98),
 		AccentColor = Color3.fromRGB(74, 255, 222),
+	},
+	title_first_light = {
+		Name = "FIRST LIGHT",
+		Description = "A first expedition title above your avatar.",
+		Slot = "Title",
+		Currency = "Shards",
+		Price = 200,
+		PrimaryColor = Color3.fromRGB(255, 216, 126),
 	},
 	drone_mint = {
 		Name = "Mint Drone",
@@ -182,6 +196,15 @@ Config.Cosmetics = {
 		PrimaryColor = Color3.fromRGB(103, 48, 72),
 		AccentColor = Color3.fromRGB(255, 139, 91),
 	},
+	vision_amber = {
+		Name = "Amber Vision",
+		Description = "A warm colorway for your alternate-reality scan.",
+		Slot = "Vision",
+		Currency = "Shards",
+		Price = 350,
+		PrimaryColor = Color3.fromRGB(255, 181, 80),
+		AccentColor = Color3.fromRGB(255, 228, 144),
+	},
 	trail_cyan = {
 		Name = "Cyan Trace",
 		Description = "A bright phase trail behind your avatar.",
@@ -199,6 +222,14 @@ Config.Cosmetics = {
 		Price = 550,
 		PrimaryColor = Color3.fromRGB(177, 110, 255),
 		AccentColor = Color3.fromRGB(91, 120, 255),
+	},
+	title_signalkeeper = {
+		Name = "SIGNALKEEPER",
+		Description = "An expedition title for explorers who watch the signals.",
+		Slot = "Title",
+		Currency = "Shards",
+		Price = 400,
+		PrimaryColor = Color3.fromRGB(121, 213, 255),
 	},
 	vision_cyan = {
 		Name = "Cyan Vision",
@@ -225,6 +256,24 @@ Config.Cosmetics = {
 		Currency = "Shards",
 		Price = 500,
 		PrimaryColor = Color3.fromRGB(88, 224, 196),
+	},
+	drone_aurora = {
+		Name = "Aurora Drone",
+		Description = "A bright companion shell from a shifting sky.",
+		Slot = "Drone",
+		Currency = "Shards",
+		Price = 950,
+		PrimaryColor = Color3.fromRGB(50, 65, 112),
+		AccentColor = Color3.fromRGB(135, 255, 217),
+	},
+	trail_starlight = {
+		Name = "Starlight Trace",
+		Description = "A pale trail left behind in the dimensional corridor.",
+		Slot = "Trail",
+		Currency = "Shards",
+		Price = 1250,
+		PrimaryColor = Color3.fromRGB(227, 239, 255),
+		AccentColor = Color3.fromRGB(136, 182, 255),
 	},
 	drone_void = {
 		Name = "Void Drone",

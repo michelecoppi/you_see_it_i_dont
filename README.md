@@ -1,5 +1,11 @@
 # YOU SEE IT, I DON'T
 
+## Direzione grafica
+
+Le immagini in `docs/images` guidano l'aspetto del laboratorio, della lobby, delle stanze e dell'HUD. I colori, il contrasto e le luci comuni sono definiti in `src/shared/VisualTheme.luau`; la corrispondenza tra i concept e gli elementi Roblox è in `VISUAL_IMPLEMENTATION_MAP.md`. Le illustrazioni non sono texture caricate nel gioco: le forme sono realizzate con istanze Roblox e gli indizi segreti continuano a essere creati soltanto sul client autorizzato.
+
+Per usare `docs/images/game_icon.png` come icona dell'esperienza, caricarla manualmente nel Roblox Creator Dashboard dell'esperienza pubblicata. Il repository non contiene una pipeline di upload o ID asset per questa immagine.
+
 Prototipo Roblox cooperativo basato su realta asimmetriche: i giocatori condividono gli stessi ambienti, ma ricevono indizi e possibilita diverse.
 
 La roadmap completa da prototipo a lancio e disponibile in [`RELEASE_PLAN.md`](RELEASE_PLAN.md). La Milestone 0 e
@@ -126,6 +132,17 @@ Il pannello arancione mostra lato client build, ambiente, seed, stanza, preset e
 per generazione, tempi, interazioni, errori e motivo di conclusione; gli errori locali usano `[QA][Client]`.
 
 ## Controlli di qualita
+
+Il tutorial compare al primo ingresso in lobby e si riapre con **HOW TO PLAY**. Lo shop e le statistiche si adattano agli schermi stretti e supportano la navigazione con gamepad.
+
+Per controllare il catalogo e preparare una pubblicazione:
+
+```powershell
+pwsh -File .\scripts\economy_audit.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\release-preflight.ps1 -Environment Production
+```
+
+`ECONOMY_AUDIT.md` documenta prezzi e ricompense; `docs/ALPHA_PLAYTEST.md` descrive le prove con giocatori reali. Il preflight segnala gli ID Marketplace mancanti e le verifiche manuali prima della pubblicazione.
 
 Le versioni degli strumenti sono fissate in `rokit.toml`:
 
