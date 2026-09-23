@@ -116,7 +116,7 @@ function LobbyController.new(config, remote, playerGui)
 	local shardBadge = Instance.new("Frame")
 	shardBadge.Name = "ShardBadge"
 	shardBadge.AnchorPoint = Vector2.new(1, 0)
-	shardBadge.Position = UDim2.fromScale(0.97, 0.025)
+	shardBadge.Position = UDim2.new(1, -12, 0, 12)
 	shardBadge.Size = UDim2.fromOffset(230, 56)
 	shardBadge.BackgroundColor3 = Theme.Colors.Panel
 	shardBadge.BackgroundTransparency = 0.04
@@ -133,7 +133,7 @@ function LobbyController.new(config, remote, playerGui)
 	local actionTray = Instance.new("Frame")
 	actionTray.Name = "LobbyActions"
 	actionTray.AnchorPoint = Vector2.new(1, 0)
-	actionTray.Position = UDim2.fromScale(0.97, 0.105)
+	actionTray.Position = UDim2.new(1, -12, 0, 76)
 	actionTray.Size = UDim2.fromOffset(300, 52)
 	actionTray.BackgroundTransparency = 1
 	actionTray.Parent = screenGui
@@ -452,7 +452,9 @@ function LobbyController.new(config, remote, playerGui)
 		self._mainPanel.Position = UDim2.new(compact and 0.03 or 0.035, 0, 0.96, 0)
 		panelConstraint.MinSize = Vector2.new(0, 112)
 		self._actionTray.Size = UDim2.fromOffset(compact and 252 or 300, 52)
-		self._actionTray.Position = UDim2.new(1, -12, 0.105, 0)
+		cosmeticsButton.Size = UDim2.fromOffset(compact and 120 or 144, 48)
+		personalStatsButton.Size = UDim2.fromOffset(compact and 120 or 144, 48)
+		personalStatsButton.Position = UDim2.fromOffset(compact and 132 or 156, 2)
 		self._shardLabel.TextSize = if compact then 13 else 17
 		self._notice.Size = UDim2.new(if compact then 0.9 else 0.62, 0, 0, 54)
 		self._notice.Position = UDim2.new(if compact then 0.05 else 0.19, 0, 0.03, 0)

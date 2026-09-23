@@ -2,6 +2,13 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+-- The old template baseplate crosses the generated lobby and expedition.
+-- Both areas build their own walkable floors below.
+local templateBaseplate = workspace:FindFirstChild("Baseplate")
+if templateBaseplate and templateBaseplate:IsA("BasePart") then
+	templateBaseplate:Destroy()
+end
+
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
 local SeedUtil = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SeedUtil"))
 local CosmeticsService = require(script:WaitForChild("CosmeticsService"))

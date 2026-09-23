@@ -277,7 +277,7 @@ Config.Cosmetics = {
 	},
 	drone_void = {
 		Name = "Void Drone",
-		Description = "Premium black-hole drone shell.",
+		Description = "Black and violet colorway for the Solo companion drone.",
 		Slot = "Drone",
 		Currency = "Pass",
 		PassId = Config.Marketplace.GamePasses.VoidDrone,
@@ -286,7 +286,7 @@ Config.Cosmetics = {
 	},
 	vision_prismatic = {
 		Name = "Prismatic Vision",
-		Description = "Premium reality-vision colorway.",
+		Description = "Prismatic colors for the alternate-vision overlay; no scan advantage.",
 		Slot = "Vision",
 		Currency = "Pass",
 		PassId = Config.Marketplace.GamePasses.PrismaticVision,
