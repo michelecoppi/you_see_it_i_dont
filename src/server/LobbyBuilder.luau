@@ -1,10 +1,10 @@
 local LobbyBuilder = {}
 local Theme = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("VisualTheme"))
+local MapLayoutBuilder = require(script.Parent:WaitForChild("MapLayoutBuilder"))
+local LobbyLayout = require(script.Parent:WaitForChild("MapLayouts"):WaitForChild("LobbyLayout"))
 
 local LOBBY_NAME = "RealityLobby"
 local ORIGIN = Vector3.new(100, 0, 0)
-local LOBBY_WIDTH = 108
-local LOBBY_LENGTH = 94
 
 local function createPart(parent, name, size, cframe, color, material)
 	local part = Instance.new("Part")
@@ -173,147 +173,11 @@ local function addPortal(parent, name, center, color, title, subtitle, actionTex
 	return prompt, portal
 end
 
-local function addLobbyArchitecture(root)
+-- The hall itself (walls, ceiling, lights, decoration) is exported from Blender into
+-- MapLayouts/LobbyLayout. Only the interactive hub core is built here.
+local function addHubCore(root)
 	local cyan = Theme.Colors.Cyan
-	local blue = Theme.Colors.Blue
 	local violet = Theme.Colors.Violet
-
-	createPart(
-		root,
-		"LobbyCeiling",
-		Vector3.new(LOBBY_WIDTH, 1, LOBBY_LENGTH),
-		CFrame.new(ORIGIN + Vector3.new(0, 17.5, 0)),
-		Color3.fromRGB(37, 47, 67),
-		Enum.Material.Metal
-	)
-	createPart(
-		root,
-		"FrontWallLeft",
-		Vector3.new(42, 17, 1),
-		CFrame.new(ORIGIN + Vector3.new(-33, 8.5, 47)),
-		Color3.fromRGB(51, 62, 84),
-		Enum.Material.Metal
-	)
-	createPart(
-		root,
-		"FrontWallRight",
-		Vector3.new(42, 17, 1),
-		CFrame.new(ORIGIN + Vector3.new(33, 8.5, 47)),
-		Color3.fromRGB(51, 62, 84),
-		Enum.Material.Metal
-	)
-	createPart(
-		root,
-		"FrontWallCenter",
-		Vector3.new(24, 17, 1),
-		CFrame.new(ORIGIN + Vector3.new(0, 8.5, 47)),
-		Color3.fromRGB(45, 56, 78),
-		Enum.Material.Metal
-	)
-
-	local centralPlatform = createPart(
-		root,
-		"CentralPlatform",
-		Vector3.new(32, 0.35, 68),
-		CFrame.new(ORIGIN + Vector3.new(0, 0.68, 5)),
-		Color3.fromRGB(71, 83, 108),
-		Enum.Material.DiamondPlate
-	)
-	centralPlatform.CanCollide = true
-
-	for _, xOffset in ipairs({ -38, 0, 38 }) do
-		local strip = createPart(
-			root,
-			"CeilingLightStrip",
-			Vector3.new(10, 0.22, 74),
-			CFrame.new(ORIGIN + Vector3.new(xOffset, 16.88, 2)),
-			if xOffset == 0 then cyan else blue,
-			Enum.Material.Neon
-		)
-		strip.CanCollide = false
-		local light = Instance.new("SurfaceLight")
-		light.Face = Enum.NormalId.Bottom
-		light.Color = strip.Color
-		light.Brightness = 1.2
-		light.Range = 25
-		light.Angle = 95
-		light.Shadows = false
-		light.Parent = strip
-	end
-
-	-- Inlaid routes lead from spawn to both portals without blocking movement.
-	for _, side in ipairs({ -1, 1 }) do
-		local route = createPart(
-			root,
-			"PortalRoute",
-			Vector3.new(0.32, 0.08, 54),
-			CFrame.new(ORIGIN + Vector3.new(side * 17, 0.56, 2)),
-			if side < 0 then cyan else violet,
-			Enum.Material.Neon
-		)
-		route.CanCollide = false
-		route.CanTouch = false
-		route.CanQuery = false
-		for _, zOffset in ipairs({ -38, -24, -10, 4, 18, 32 }) do
-			local cross = createPart(
-				root,
-				"RouteMarker",
-				Vector3.new(3.5, 0.08, 0.28),
-				CFrame.new(ORIGIN + Vector3.new(side * 17, 0.56, zOffset)),
-				if side < 0 then cyan else violet,
-				Enum.Material.Neon
-			)
-			cross.CanCollide = false
-			cross.CanTouch = false
-			cross.CanQuery = false
-		end
-	end
-
-	for _, side in ipairs({ -1, 1 }) do
-		for index, zOffset in ipairs({ -35, -12, 12, 35 }) do
-			local panel = createPart(
-				root,
-				"LobbyWallPanel",
-				Vector3.new(0.3, 10, 16),
-				CFrame.new(ORIGIN + Vector3.new(side * 53.35, 8, zOffset)),
-				Color3.fromRGB(50, 60, 82),
-				Enum.Material.DiamondPlate
-			)
-			panel.CanCollide = false
-			local accent = createPart(
-				root,
-				"LobbyWallAccent",
-				Vector3.new(0.16, 0.45, 13),
-				CFrame.new(ORIGIN + Vector3.new(side * 53.14, 10.8, zOffset)),
-				if index % 2 == 0 then violet else cyan,
-				Enum.Material.Neon
-			)
-			accent.CanCollide = false
-		end
-	end
-
-	for _, xOffset in ipairs({ -47, 47 }) do
-		for _, zOffset in ipairs({ -40, 40 }) do
-			local column = createPart(
-				root,
-				"SupportColumn",
-				Vector3.new(3, 17, 3),
-				CFrame.new(ORIGIN + Vector3.new(xOffset, 8.5, zOffset)),
-				Color3.fromRGB(43, 50, 70),
-				Enum.Material.Metal
-			)
-			local columnGlow = createPart(
-				root,
-				"ColumnGlow",
-				Vector3.new(3.15, 0.35, 3.15),
-				CFrame.new(ORIGIN + Vector3.new(xOffset, 11.8, zOffset)),
-				violet,
-				Enum.Material.Neon
-			)
-			columnGlow.CanCollide = false
-			column.CanCollide = true
-		end
-	end
 
 	local hubCore = createPart(
 		root,
@@ -612,39 +476,8 @@ function LobbyBuilder.Build()
 	root.Name = LOBBY_NAME
 	root.Parent = workspace
 
-	createPart(
-		root,
-		"LobbyFloor",
-		Vector3.new(LOBBY_WIDTH, 1, LOBBY_LENGTH),
-		CFrame.new(ORIGIN),
-		Color3.fromRGB(61, 72, 94),
-		Enum.Material.Slate
-	)
-	createPart(
-		root,
-		"BackWall",
-		Vector3.new(LOBBY_WIDTH, 17, 1),
-		CFrame.new(ORIGIN + Vector3.new(0, 8.5, -47)),
-		Color3.fromRGB(51, 62, 84),
-		Enum.Material.Metal
-	)
-	createPart(
-		root,
-		"LeftWall",
-		Vector3.new(1, 17, LOBBY_LENGTH),
-		CFrame.new(ORIGIN + Vector3.new(-54, 8.5, 0)),
-		Color3.fromRGB(51, 62, 84),
-		Enum.Material.Metal
-	)
-	createPart(
-		root,
-		"RightWall",
-		Vector3.new(1, 17, LOBBY_LENGTH),
-		CFrame.new(ORIGIN + Vector3.new(54, 8.5, 0)),
-		Color3.fromRGB(51, 62, 84),
-		Enum.Material.Metal
-	)
-	local launchPad = addLobbyArchitecture(root)
+	MapLayoutBuilder.Build(root, LobbyLayout)
+	local launchPad = addHubCore(root)
 
 	local header = createPart(
 		root,
@@ -711,7 +544,7 @@ function LobbyBuilder.Build()
 	local successBoardLabel = addLeaderboardBoard(
 		root,
 		"SuccessfulEscapesBoard",
-		ORIGIN + Vector3.new(-53.8, 8.7, -19),
+		ORIGIN + Vector3.new(-53.8, 8.7, -15),
 		90,
 		Color3.fromRGB(70, 225, 218),
 		"TOP SUCCESSFUL ESCAPES"
@@ -719,7 +552,7 @@ function LobbyBuilder.Build()
 	local failureBoardLabel = addLeaderboardBoard(
 		root,
 		"FailedEscapesBoard",
-		ORIGIN + Vector3.new(53.8, 8.7, -19),
+		ORIGIN + Vector3.new(53.8, 8.7, -15),
 		-90,
 		Color3.fromRGB(255, 112, 129),
 		"HALL OF GLORIOUS FAILURES"
@@ -727,18 +560,6 @@ function LobbyBuilder.Build()
 	local dailyPrompt, dailyCore = addDailyReactor(root)
 	local mixerButtons, mixerLabel = addRealityMixer(root)
 	local briefingPrompt, briefingLabel = addBriefingTerminal(root)
-
-	for index, zOffset in ipairs({ -20, 8, 34 }) do
-		local strip = createPart(
-			root,
-			"FloorGuide_" .. tostring(index),
-			Vector3.new(96, 0.12, 0.8),
-			CFrame.new(ORIGIN + Vector3.new(0, 0.58, zOffset)),
-			if index % 2 == 0 then Color3.fromRGB(91, 120, 255) else Color3.fromRGB(88, 224, 196),
-			Enum.Material.Neon
-		)
-		strip.CanCollide = false
-	end
 
 	return {
 		Root = root,

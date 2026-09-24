@@ -13,6 +13,7 @@ local roundStateRemote = ReplicatedStorage:WaitForChild("GameRemotes"):WaitForCh
 local lobbyEvent = ReplicatedStorage:WaitForChild("GameRemotes"):WaitForChild("LobbyEvent")
 local LobbyController = require(script:WaitForChild("LobbyController"))
 local SeerClueRenderer = require(script:WaitForChild("SeerClueRenderer"))
+local TeleportScreen = require(script:WaitForChild("TeleportScreen"))
 local TutorialController = require(script:WaitForChild("TutorialController"))
 local playerGui = player:WaitForChild("PlayerGui")
 
@@ -278,6 +279,26 @@ overlayGradient.Transparency = NumberSequence.new({
 overlayGradient.Parent = visionOverlay
 
 local lobbyController = LobbyController.new(Config, lobbyEvent, playerGui)
+local teleportScreen = TeleportScreen.new(playerGui)
+
+lobbyEvent.OnClientEvent:Connect(function(payload)
+	if typeof(payload) ~= "table" then
+		return
+	end
+	if payload.type == "Teleporting" and payload.direction == "Return" then
+		teleportScreen:Show("RETURNING TO THE HUB", "Expedition complete. Heading back to the lobby...")
+	elseif payload.type == "Teleporting" then
+		local crewSize = tonumber(payload.crewSize) or 1
+		teleportScreen:Show(
+			"ENTERING EXPEDITION",
+			if crewSize > 1
+				then string.format("Opening a private reality for your crew of %d...", crewSize)
+				else "Opening a private reality for your solo run..."
+		)
+	elseif payload.type == "TeleportCancelled" then
+		teleportScreen:Hide()
+	end
+end)
 local seerClueRenderer = SeerClueRenderer.new("PrototypeMap")
 local tutorialController = TutorialController.new(playerGui)
 

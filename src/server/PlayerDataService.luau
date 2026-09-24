@@ -251,7 +251,8 @@ function PlayerDataService:_emitStats(player)
 	self:_syncLeaderstats(player)
 end
 
-function PlayerDataService:LoadPlayer(player)
+-- options.CountSession = false skips the Sessions stat (used for lobby <-> expedition server hops).
+function PlayerDataService:LoadPlayer(player, options)
 	if self._loaded[player] then
 		return self._profiles[player]
 	end
@@ -278,7 +279,9 @@ function PlayerDataService:LoadPlayer(player)
 	self._profiles[player] = profile
 	self._loaded[player] = true
 	self._sessionStartedAt[player] = os.clock()
-	profile.Stats.Sessions += 1
+	if not options or options.CountSession ~= false then
+		profile.Stats.Sessions += 1
+	end
 	profile.Stats.LastPlayedUnix = os.time()
 	player:SetAttribute("ProfileLoaded", true)
 	player:SetAttribute("DataPersistent", persistent)

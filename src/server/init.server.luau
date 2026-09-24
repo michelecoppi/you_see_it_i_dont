@@ -15,6 +15,7 @@ local CosmeticsService = require(script:WaitForChild("CosmeticsService"))
 local LeaderboardService = require(script:WaitForChild("LeaderboardService"))
 local LobbyBuilder = require(script:WaitForChild("LobbyBuilder"))
 local MapBuilder = require(script:WaitForChild("MapBuilder"))
+local MatchSessionService = require(script:WaitForChild("MatchSessionService"))
 local PlayerDataService = require(script:WaitForChild("PlayerDataService"))
 local QAService = require(script:WaitForChild("QAService"))
 local RemoteGuard = require(script:WaitForChild("RemoteGuard"))
@@ -36,13 +37,19 @@ local lobbyEvent = remotes:FindFirstChild("LobbyEvent") or Instance.new("RemoteE
 lobbyEvent.Name = "LobbyEvent"
 lobbyEvent.Parent = remotes
 
+-- Filled in below once the lobby helpers exist; MatchSessionService calls it on teleport failures.
+local sessionCallbacks = {}
+local matchSessions = MatchSessionService.new(Config, sessionCallbacks)
+local isMatchServer = matchSessions:IsMatch()
+
 local map = MapBuilder.Build(Config.Signals)
-local lobby = LobbyBuilder.Build()
+-- Expedition servers only host the lab: their players never see the hub.
+local lobby = if isMatchServer then nil else LobbyBuilder.Build()
 local soloDrone = SoloDrone.new(map.Root)
 local playerData = PlayerDataService.new(Config)
 local leaderboardService = LeaderboardService.new(Config, playerData, {
-	Success = lobby.SuccessBoardLabel,
-	Failure = lobby.FailureBoardLabel,
+	Success = lobby and lobby.SuccessBoardLabel,
+	Failure = lobby and lobby.FailureBoardLabel,
 })
 local telemetry = TelemetryService.new(Config)
 local qa = QAService.new(Config, SeedUtil)
@@ -74,10 +81,11 @@ local roomGenerator
 
 print(
 	string.format(
-		"[Build][Server] version=%s | build=%s | environment=%s",
+		"[Build][Server] version=%s | build=%s | environment=%s | role=%s",
 		Config.Version,
 		Config.BuildId,
-		Config.EnvironmentName
+		Config.EnvironmentName,
+		matchSessions.Role
 	)
 )
 
@@ -103,6 +111,14 @@ local currentSpawnCFrame = map.Spawn.CFrame
 local roundResultRecorded = {}
 local matchRunning = false
 local groupCountdown = nil
+local lastRoundOutcome = nil
+local sessionDifficulty = nil
+-- What non-participants see. Expedition servers show a connecting/returning screen instead of the hub.
+local idlePhase = if isMatchServer then "Connecting" else "Lobby"
+local idleStatus = if isMatchServer
+	then "Synchronizing the expedition crew..."
+	else "Welcome to the Reality Expedition Hub."
+local crewLocked = false
 
 local participants = {}
 local participantSet = {}
@@ -177,13 +193,15 @@ local function sendRoundSnapshot(player)
 	local now = getServerTime()
 	if not isParticipant(player) then
 		roundStateRemote:FireClient(player, {
-			phase = "Lobby",
+			phase = idlePhase,
 			timeLeft = 0,
 			roundNumber = roundNumber,
 			role = Config.Roles.Hybrid,
 			roleColor = Config.RoleColors[Config.Roles.Hybrid],
-			instructions = "Choose an expedition from the lobby.",
-			status = "Welcome to the Reality Expedition Hub.",
+			instructions = if isMatchServer
+				then "Your expedition server is getting ready."
+				else "Choose an expedition from the lobby.",
+			status = idleStatus,
 			gateOpen = false,
 			buildVersion = Config.Build.DisplayVersion,
 			environment = Config.EnvironmentName,
@@ -319,7 +337,9 @@ end
 
 local function broadcastLobbyState()
 	local queueCount = countValidQueue(groupQueue, groupQueued)
-	if matchRunning then
+	if not lobby then
+		-- Expedition servers have no queue board.
+	elseif matchRunning then
 		lobby.QueueBoardLabel.Text = "GROUP QUEUE\n" .. tostring(queueCount) .. " WAITING  •  EXPEDITION ACTIVE"
 	elseif groupCountdown then
 		lobby.QueueBoardLabel.Text = "GROUP QUEUE\n"
@@ -362,7 +382,9 @@ end
 local function teleportToLobby(player)
 	local character = player.Character
 	if character then
-		character:PivotTo(lobby.Spawn.CFrame + Vector3.new(0, 4, 0))
+		-- Expedition servers have no hub: idle players wait in the lab's airlock.
+		local spawnCFrame = if lobby then lobby.Spawn.CFrame else map.Spawn.CFrame
+		character:PivotTo(spawnCFrame + Vector3.new(0, 4, 0))
 	end
 end
 
@@ -461,6 +483,7 @@ local function resolveRound(message, awardWin)
 		then "Success"
 		elseif string.find(message, "Time ran out", 1, true) then "Timeout"
 		else "Abandoned"
+	lastRoundOutcome = outcome
 	roundDebug:Log("RoundResolved", {
 		duration = usedTime,
 		mistakes = roundMistakes,
@@ -654,7 +677,22 @@ roomGenerator = RoomGenerator.new(map.Root, map.Spawn, Config, {
 	end,
 })
 
+local function rejectQueueRequest(player)
+	if isMatchServer then
+		sendNotice(player, "This server hosts a single expedition. You will return to the hub afterwards.", true)
+		return true
+	end
+	if player:GetAttribute("PlayerState") == "Teleporting" then
+		sendNotice(player, "You are already travelling to an expedition.", true)
+		return true
+	end
+	return false
+end
+
 local function requestSolo(player)
+	if rejectQueueRequest(player) then
+		return
+	end
 	if isParticipant(player) then
 		sendNotice(player, "You are already in an expedition.", true)
 		return
@@ -682,6 +720,9 @@ local function requestSolo(player)
 end
 
 local function requestGroup(player)
+	if rejectQueueRequest(player) then
+		return
+	end
 	if isParticipant(player) then
 		sendNotice(player, "You are already in an expedition.", true)
 		return
@@ -842,41 +883,43 @@ local function decodeBriefing(player)
 	sendNotice(player, message)
 end
 
-lobby.SoloPrompt.Triggered:Connect(requestSolo)
-lobby.GroupPrompt.Triggered:Connect(requestGroup)
-lobby.DailyPrompt.Triggered:Connect(claimDailyReward)
-lobby.BriefingPrompt.Triggered:Connect(decodeBriefing)
-for _, choice in ipairs(lobby.MixerButtons) do
-	choice.Prompt.Triggered:Connect(function(player)
-		setLobbyEnergy(player, choice)
+if lobby then
+	lobby.SoloPrompt.Triggered:Connect(requestSolo)
+	lobby.GroupPrompt.Triggered:Connect(requestGroup)
+	lobby.DailyPrompt.Triggered:Connect(claimDailyReward)
+	lobby.BriefingPrompt.Triggered:Connect(decodeBriefing)
+	for _, choice in ipairs(lobby.MixerButtons) do
+		choice.Prompt.Triggered:Connect(function(player)
+			setLobbyEnergy(player, choice)
+		end)
+	end
+
+	local launchDebounce = {}
+	lobby.LaunchPad.Touched:Connect(function(hit)
+		local character = hit:FindFirstAncestorOfClass("Model")
+		local player = if character then Players:GetPlayerFromCharacter(character) else nil
+		if not player or launchDebounce[player] or not playerData:IsLoaded(player) then
+			return
+		end
+		local rootPart = character:FindFirstChild("HumanoidRootPart")
+		if not rootPart then
+			return
+		end
+		launchDebounce[player] = true
+		rootPart.AssemblyLinearVelocity =
+			Vector3.new(rootPart.AssemblyLinearVelocity.X, 58, rootPart.AssemblyLinearVelocity.Z)
+		local emitter = lobby.LaunchPad:FindFirstChild("LaunchBurst")
+		if emitter then
+			emitter:Emit(30)
+		end
+		playerData:IncrementStat(player, "LaunchPadUses", 1)
+		playerData:IncrementStat(player, "LobbyInteractions", 1)
+		telemetry:Log(player, "AnomalyPadUsed", 1, { "Lobby", "Launch", "Physical" })
+		task.delay(1.5, function()
+			launchDebounce[player] = nil
+		end)
 	end)
 end
-
-local launchDebounce = {}
-lobby.LaunchPad.Touched:Connect(function(hit)
-	local character = hit:FindFirstAncestorOfClass("Model")
-	local player = if character then Players:GetPlayerFromCharacter(character) else nil
-	if not player or launchDebounce[player] or not playerData:IsLoaded(player) then
-		return
-	end
-	local rootPart = character:FindFirstChild("HumanoidRootPart")
-	if not rootPart then
-		return
-	end
-	launchDebounce[player] = true
-	rootPart.AssemblyLinearVelocity =
-		Vector3.new(rootPart.AssemblyLinearVelocity.X, 58, rootPart.AssemblyLinearVelocity.Z)
-	local emitter = lobby.LaunchPad:FindFirstChild("LaunchBurst")
-	if emitter then
-		emitter:Emit(30)
-	end
-	playerData:IncrementStat(player, "LaunchPadUses", 1)
-	playerData:IncrementStat(player, "LobbyInteractions", 1)
-	telemetry:Log(player, "AnomalyPadUsed", 1, { "Lobby", "Launch", "Physical" })
-	task.delay(1.5, function()
-		launchDebounce[player] = nil
-	end)
-end)
 
 local function findPassItem(passId)
 	for itemId, item in pairs(Config.Cosmetics) do
@@ -1047,10 +1090,79 @@ MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, passI
 	end
 end)
 
+local function saveProfiles(players)
+	-- Persist before a server hop so the next server loads up-to-date Shards and stats.
+	local remaining = #players
+	if remaining == 0 then
+		return
+	end
+	local done = Instance.new("BindableEvent")
+	for _, player in ipairs(players) do
+		task.spawn(function()
+			playerData:SavePlayer(player)
+			remaining -= 1
+			if remaining == 0 then
+				done:Fire()
+			end
+		end)
+	end
+	if remaining > 0 then
+		done.Event:Wait()
+	end
+	done:Destroy()
+end
+
+sessionCallbacks.OnTeleportFailed = function(player, kind, _message)
+	if player.Parent ~= Players then
+		return
+	end
+	if kind == "Expedition" then
+		player:SetAttribute("PlayerState", "Lobby")
+		lobbyEvent:FireClient(player, { type = "TeleportCancelled" })
+		sendNotice(player, "The expedition server could not be reached. Please queue again.", true)
+		broadcastLobbyState()
+	else
+		player:Kick("The expedition is over but the hub could not be reached. Rejoin to return to the lobby.")
+	end
+end
+
+local function handleSessionArrival(player)
+	if not isMatchServer then
+		local returnData = matchSessions:GetReturnData(player)
+		if returnData then
+			task.delay(2, function()
+				if player.Parent == Players then
+					sendNotice(player, "Welcome back to the hub! Expedition result: " .. tostring(returnData.Outcome))
+				end
+			end)
+		end
+		return true
+	end
+
+	local accepted, reason = matchSessions:RegisterArrival(player)
+	if accepted and not crewLocked then
+		return true
+	end
+	warn(
+		string.format(
+			"[Sessions] Sending userId=%d back to the hub: %s",
+			player.UserId,
+			if accepted then "expedition already started" else tostring(reason)
+		)
+	)
+	task.spawn(function()
+		matchSessions:ReturnToLobby({ player }, "Rejected")
+	end)
+	return false
+end
+
 Players.PlayerAdded:Connect(function(player)
 	setupLeaderstats(player)
-	player:SetAttribute("PlayerState", "Lobby")
+	player:SetAttribute("PlayerState", if isMatchServer then "Arriving" else "Lobby")
 	player:SetAttribute("Role", nil)
+	-- A server hop is not a new play session: only the first server a player joins counts it.
+	local countSession = not isMatchServer and matchSessions:GetReturnData(player) == nil
+	handleSessionArrival(player)
 
 	player.CharacterAdded:Connect(function(_character)
 		task.wait(0.2)
@@ -1066,7 +1178,7 @@ Players.PlayerAdded:Connect(function(player)
 	end)
 
 	task.spawn(function()
-		local profile = playerData:LoadPlayer(player)
+		local profile = playerData:LoadPlayer(player, { CountSession = countSession })
 		if not profile or player.Parent ~= Players then
 			return
 		end
@@ -1109,9 +1221,11 @@ end)
 
 for _, player in ipairs(Players:GetPlayers()) do
 	setupLeaderstats(player)
-	player:SetAttribute("PlayerState", "Lobby")
+	player:SetAttribute("PlayerState", if isMatchServer then "Arriving" else "Lobby")
+	local countSession = not isMatchServer and matchSessions:GetReturnData(player) == nil
+	handleSessionArrival(player)
 	task.spawn(function()
-		playerData:LoadPlayer(player)
+		playerData:LoadPlayer(player, { CountSession = countSession })
 		playerData:RefreshOwnedPasses(player)
 		leaderboardService:UpdatePlayer(player)
 		CosmeticsService.Apply(Config, player, playerData:GetProfile(player))
@@ -1230,27 +1344,73 @@ local function beginMatch(selectedPlayers)
 	return true
 end
 
-local function returnMatchToLobby()
+local function releaseParticipants(nextState)
 	roomGenerator:SetActive(false)
 	gateOpen = false
 
-	for _, player in ipairs(getParticipants()) do
+	local released = getParticipants()
+	for _, player in ipairs(released) do
 		clearVisionState(player)
 		participantSet[player] = nil
 		player:SetAttribute("Role", nil)
-		player:SetAttribute("PlayerState", "Lobby")
+		player:SetAttribute("PlayerState", nextState)
 		soloDrone:SetEnabledForPlayer(player, false)
-		teleportToLobby(player)
-		sendRoundSnapshot(player)
 	end
 
 	participants = {}
 	participantSet = {}
 	matchRunning = false
 	phase = "Lobby"
-	statusMessage = "Choose your next expedition."
 	currentSpawnCFrame = map.Spawn.CFrame
+	return released
+end
+
+local function returnMatchToLobby()
+	for _, player in ipairs(releaseParticipants("Lobby")) do
+		teleportToLobby(player)
+		sendRoundSnapshot(player)
+	end
+	statusMessage = "Choose your next expedition."
 	broadcastLobbyState()
+end
+
+-- Lobby role: hands the selected crew to a brand-new reserved server. Returns false when the
+-- reservation or teleport failed, so the caller can run the expedition locally instead.
+local function launchSession(selectedPlayers)
+	local crew = {}
+	for _, player in ipairs(selectedPlayers) do
+		if player.Parent == Players then
+			removeFromQueues(player)
+			player:SetAttribute("PlayerState", "Teleporting")
+			table.insert(crew, player)
+		end
+	end
+	if #crew == 0 then
+		return true
+	end
+
+	local mode = if #crew == 1 then "Solo" else "Group"
+	for _, player in ipairs(crew) do
+		lobbyEvent:FireClient(player, { type = "Teleporting", mode = mode, crewSize = #crew })
+		telemetry:Log(player, "SessionTeleport", 1, { mode, "Lobby", "Expedition" })
+	end
+	broadcastLobbyState()
+	saveProfiles(crew)
+
+	local launched, result = matchSessions:LaunchExpedition(crew, mode, Config.Round.Difficulty)
+	if launched then
+		print(string.format("[Sessions] %s expedition %s launched for %d player(s)", mode, tostring(result), #crew))
+		return true
+	end
+
+	warn("[Sessions] " .. tostring(result) .. " | running the expedition in the hub server instead")
+	for _, player in ipairs(crew) do
+		if player.Parent == Players then
+			player:SetAttribute("PlayerState", "Lobby")
+			lobbyEvent:FireClient(player, { type = "TeleportCancelled" })
+		end
+	end
+	return false
 end
 
 local function runMatch()
@@ -1268,7 +1428,7 @@ local function runMatch()
 	currentRoundSeed = SeedUtil.Normalize(currentRoundSeed)
 	currentRoundSeedId = SeedUtil.Identifier(currentRoundSeed)
 	local generationOptions = qa:GetGenerationOptions() or {}
-	generationOptions.Difficulty = generationOptions.Difficulty or Config.Round.Difficulty
+	generationOptions.Difficulty = generationOptions.Difficulty or sessionDifficulty or Config.Round.Difficulty
 	generationOptions.Seed = currentRoundSeed
 	generationOptions.SeedId = currentRoundSeedId
 	generationOptions.BuildVersion = Config.Build.DisplayVersion
@@ -1354,10 +1514,59 @@ game:BindToClose(function()
 	playerData:Shutdown()
 end)
 
-while true do
-	local selectedPlayers = waitForNextMatch()
-	if beginMatch(selectedPlayers) then
-		runMatch()
-		returnMatchToLobby()
+-- Match role: one expedition for the crew that was teleported here, then everyone goes back to a hub.
+local function runSessionServer()
+	while true do
+		idlePhase = "Connecting"
+		idleStatus = "Synchronizing the expedition crew..."
+		crewLocked = false
+		local crew = matchSessions:WaitForCrew(function(player)
+			return playerData:IsLoaded(player)
+		end, function(readyCount, expectedCount)
+			idleStatus = string.format("Synchronizing the expedition crew... %d/%d", readyCount, expectedCount)
+		end)
+		crewLocked = true
+		local session = matchSessions.Session
+		sessionDifficulty = session and session.Difficulty
+		lastRoundOutcome = "Abandoned"
+		if beginMatch(crew) then
+			runMatch()
+		end
+
+		idlePhase = "Returning"
+		idleStatus = statusMessage .. "\nReturning to the Reality Expedition Hub..."
+		releaseParticipants("Returning")
+		for _, player in ipairs(Players:GetPlayers()) do
+			sendRoundSnapshot(player)
+		end
+		task.wait(Config.Sessions.ReturnDelaySeconds or 2)
+		local everyone = Players:GetPlayers()
+		for _, player in ipairs(everyone) do
+			lobbyEvent:FireClient(player, { type = "Teleporting", direction = "Return" })
+		end
+		saveProfiles(everyone)
+		if matchSessions:ReturnToLobby(everyone, lastRoundOutcome) then
+			-- Players are on their way out; the reserved server shuts down once it is empty.
+			return
+		end
+		-- Studio (no TeleportService): run another expedition with the same testers.
+		for _, player in ipairs(Players:GetPlayers()) do
+			lobbyEvent:FireClient(player, { type = "TeleportCancelled" })
+			player:SetAttribute("PlayerState", "Arriving")
+			teleportToLobby(player)
+		end
+	end
+end
+
+if isMatchServer then
+	runSessionServer()
+else
+	while true do
+		local selectedPlayers = waitForNextMatch()
+		local launched = matchSessions:IsLobby() and launchSession(selectedPlayers)
+		if not launched and beginMatch(selectedPlayers) then
+			runMatch()
+			returnMatchToLobby()
+		end
 	end
 end

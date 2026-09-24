@@ -32,6 +32,26 @@ Config.Lobby = {
 	DailyReward = 50,
 }
 
+-- Every expedition runs in its own reserved server (a new session). The lobby server only queues
+-- players and teleports them; the reserved server runs one expedition and sends the crew back.
+-- TeleportService does not work in Studio, so Studio keeps lobby and expedition in one server
+-- unless the Workspace attribute below is set to "Match" or "Lobby" to exercise a role.
+Config.Sessions = {
+	Enabled = true,
+	MatchPlaceId = Config.EnvironmentProfile.Sessions.MatchPlaceId,
+	LobbyPlaceId = Config.EnvironmentProfile.Sessions.LobbyPlaceId,
+	StudioRoleOverrideAttribute = "ServerRoleOverride",
+	ReserveAttempts = 3,
+	TeleportAttempts = 3,
+	RetryDelaySeconds = 2,
+	-- How long a reserved server waits for the whole crew before starting with whoever arrived.
+	CrewWaitSeconds = 25,
+	-- Studio "Match" override: players that joined within this window form the crew.
+	StudioCrewWaitSeconds = 3,
+	-- Pause on the results screen before the crew is sent back to the hub.
+	ReturnDelaySeconds = 2,
+}
+
 Config.Round = {
 	IntermissionDuration = 8,
 	RoomCount = 3,

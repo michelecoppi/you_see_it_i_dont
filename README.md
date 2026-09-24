@@ -25,8 +25,39 @@ l'ambiente viene scelto dal valore versionato `Environment.PublishedEnvironment`
 1. Il giocatore nasce in una lobby fisica.
 2. Entra nel portale Solo oppure nella coda Gruppo da 2-6 giocatori.
 3. La lavagna della lobby mostra quanti utenti sono in attesa e il countdown di partenza.
-4. La spedizione genera tre mini-stanze in ordine casuale.
-5. Completate tutte le stanze, il gruppo raggiunge la piattaforma di estrazione e riceve Reality Shards.
+4. Alla partenza il server della lobby crea una **nuova sessione** (un server riservato) e teletrasporta lì la squadra.
+5. Nel nuovo server la spedizione genera tre mini-stanze in ordine casuale.
+6. Completate tutte le stanze, il gruppo raggiunge la piattaforma di estrazione e riceve Reality Shards.
+7. Dopo il risultato la squadra torna automaticamente in una lobby pubblica.
+
+## Sessioni di partita (server riservati)
+
+Ogni spedizione gira in un server tutto suo, quindi la lobby resta sempre libera e più spedizioni possono svolgersi in
+parallelo.
+
+- **Lobby** (server pubblico): gestisce code, shop e classifiche. Quando una partita parte salva i profili, chiama
+  `TeleportService:ReserveServer` e teletrasporta la squadra con `TeleportAsync` passando i dati della sessione
+  (ID sessione, modalità, lista dei giocatori, difficoltà).
+- **Match** (server riservato): costruisce solo il laboratorio, accetta esclusivamente i giocatori elencati nei dati della
+  sessione, aspetta tutta la squadra (massimo 25 secondi, poi parte con chi è arrivato), esegue la spedizione e alla fine
+  salva i profili e riporta tutti nella lobby. Chi arriva in ritardo viene rimandato alla lobby.
+- Durante il viaggio il client mostra una schermata di transizione che resta visibile anche nel caricamento del nuovo
+  server (`TeleportService:SetTeleportGui` + `ReplicatedFirst/TeleportArrival`).
+- Se la prenotazione o il teletrasporto falliscono dopo i tentativi previsti, la spedizione viene eseguita nel server della
+  lobby come prima, così il gioco resta giocabile.
+- Il contratto dei dati è in `src/shared/MatchSession.luau` (testato in `tests/MatchSession.spec.luau`), le chiamate a
+  `TeleportService` in `src/server/MatchSessionService.luau`, i parametri in `Config.Sessions`.
+
+Di default lobby e spedizioni usano **lo stesso place** (i server riservati sono istanze dello stesso place). Per usare un
+place separato per le partite imposta `Sessions.MatchPlaceId` (e `Sessions.LobbyPlaceId`) nel profilo di
+`src/shared/EnvironmentConfig.luau`: entrambi i place devono appartenere alla stessa esperienza e contenere questo progetto.
+
+`TeleportService` non funziona in Studio: lì lobby e spedizione restano nello stesso server. Per provare il comportamento
+del server di partita in Studio imposta prima di **Play**:
+
+```lua
+workspace:SetAttribute("ServerRoleOverride", "Match") -- oppure "Lobby" per provare il fallback locale
+```
 
 La difficolta del round e esplicita e versionata: `Easy`, `Normal` (default) o `Hard`. Il livello viene scelto dal
 server, applicato in modo deterministico a tutte le stanze della spedizione e mostrato nell'HUD.
@@ -42,6 +73,13 @@ server, applicato in modo deterministico a tutte le stanze della spedizione e mo
 Ogni spedizione sceglie tre preset diversi e ne mescola l'ordine. La soluzione, lo stato iniziale e la validazione dei
 cinque puzzle sono moduli puri in `src/shared/Puzzles`; `RoomGenerator.luau` si occupa della rappresentazione e delle
 interazioni Roblox.
+
+## Mappe con Blender
+
+L'architettura e le decorazioni di lobby e laboratorio sono una scena Blender (`blender/maps.blend`) esportata in moduli
+Luau (`src/server/MapLayouts`) e istanziata da `src/server/MapLayoutBuilder.luau`. Gli elementi con logica (portali,
+console, bacheche, stanze procedurali) restano in Luau. Flusso di lavoro, convenzioni e comandi sono in
+[`blender/README.md`](blender/README.md); le anteprime renderizzate sono in `docs/images/blender`.
 
 ## Pacing e playtest
 
@@ -61,7 +99,8 @@ interazioni Roblox.
 
 ## Lobby, economia e shop
 
-- Lobby 3D ampliata a 108x94 stud, con piu spazio tra portali e attivita.
+- Lobby 3D di 108x94 stud progettata in Blender: pareti con angoli smussati, finestre alte, lucernario sopra l'Hub Core,
+  prisma sospeso, colonne, fioriere, panchine e skyline esterno.
 - Portali fisici Solo e Gruppo.
 - I pulsanti UI **Cosmetics** e **My Stats** sono visibili solo nella lobby.
 - **Cosmetics** apre un unico menu per acquistare ed equipaggiare gli oggetti; **My Stats** mostra le statistiche personali complete.
@@ -78,7 +117,9 @@ interazioni Roblox.
 
 ## Spazi di gioco
 
-- Il laboratorio della spedizione e stato ampliato a 68x150 stud.
+- Il laboratorio della spedizione (68x150 stud) è progettato in Blender: nervature e capriate, finestre alte, luci a
+  soffitto per ogni camera, airlock d'ingresso, cornici dei cancelli e baia di estrazione con aloni e piloni.
+- Il perimetro collidibile è identico a prima, quindi la validazione geometrica di `RoomGenerator` continua a valere.
 - Le tre camere procedurali sono piu larghe e piu distanti tra loro, con console e percorsi riposizionati.
 - Cartelli, numeri e pannelli-indizio delle stanze successive restano nascosti finche la stanza non viene attivata.
 - I nomi delle camere sono integrati nella parete laterale, senza pannelli sospesi al centro del percorso.
