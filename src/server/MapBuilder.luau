@@ -1,16 +1,14 @@
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
 local Theme = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("VisualTheme"))
+local MapLayoutBuilder = require(script.Parent:WaitForChild("MapLayoutBuilder"))
+local ExpeditionLayout = require(script.Parent:WaitForChild("MapLayouts"):WaitForChild("ExpeditionLayout"))
 
 local MapBuilder = {}
 
 local MAP_NAME = "PrototypeMap"
 local CLOSED_GATE_CFRAME = CFrame.new(0, 7.5, 5)
 local OPEN_GATE_CFRAME = CFrame.new(0, 21.5, 5)
-
-local ROOM_WIDTH = 68
-local ROOM_LENGTH = 150
-local ROOM_CENTER_Z = 7
 
 local function createPart(parent, name, size, cframe, color, material)
 	local part = Instance.new("Part")
@@ -25,19 +23,6 @@ local function createPart(parent, name, size, cframe, color, material)
 	part.CastShadow = material ~= Enum.Material.Neon
 	part.Parent = parent
 	return part
-end
-
-local function addCornerLight(parent, position, color)
-	local fixture =
-		createPart(parent, "WallLight", Vector3.new(0.5, 4, 0.5), CFrame.new(position), color, Enum.Material.Neon)
-	fixture.CanCollide = false
-
-	local light = Instance.new("PointLight")
-	light.Color = color
-	light.Brightness = 1.1
-	light.Range = 19
-	light.Shadows = false
-	light.Parent = fixture
 end
 
 local function configureLighting()
@@ -110,151 +95,11 @@ local function addSurfaceText(part, text, face)
 	return label
 end
 
-local function buildRoomShell(map)
-	local floor = createPart(
-		map,
-		"Floor",
-		Vector3.new(ROOM_WIDTH, 1, ROOM_LENGTH),
-		CFrame.new(0, 0, ROOM_CENTER_Z),
-		Color3.fromRGB(55, 65, 86),
-		Enum.Material.Slate
-	)
-	floor.Locked = true
-	floor:SetAttribute("GeometryRole", "Support")
-
-	createPart(
-		map,
-		"LeftWall",
-		Vector3.new(1, 18, ROOM_LENGTH),
-		CFrame.new(-34.5, 9, ROOM_CENTER_Z),
-		Color3.fromRGB(48, 58, 79),
-		Enum.Material.Metal
-	)
-	createPart(
-		map,
-		"RightWall",
-		Vector3.new(1, 18, ROOM_LENGTH),
-		CFrame.new(34.5, 9, ROOM_CENTER_Z),
-		Color3.fromRGB(48, 58, 79),
-		Enum.Material.Metal
-	)
-	createPart(
-		map,
-		"BackWall",
-		Vector3.new(ROOM_WIDTH, 18, 1),
-		CFrame.new(0, 9, -68.5),
-		Color3.fromRGB(48, 58, 79),
-		Enum.Material.Metal
-	)
-	createPart(
-		map,
-		"FrontWall",
-		Vector3.new(ROOM_WIDTH, 18, 1),
-		CFrame.new(0, 9, 82.5),
-		Color3.fromRGB(48, 58, 79),
-		Enum.Material.Metal
-	)
-	createPart(
-		map,
-		"Ceiling",
-		Vector3.new(ROOM_WIDTH, 1, ROOM_LENGTH),
-		CFrame.new(0, 18, ROOM_CENTER_Z),
-		Color3.fromRGB(34, 43, 62),
-		Enum.Material.Metal
-	)
-
-	for _, position in ipairs({
-		Vector3.new(-33.7, 8, -58),
-		Vector3.new(33.7, 8, -58),
-		Vector3.new(-33.7, 8, -30),
-		Vector3.new(33.7, 8, -30),
-		Vector3.new(-33.7, 8, 0),
-		Vector3.new(33.7, 8, 0),
-		Vector3.new(-33.7, 8, 30),
-		Vector3.new(33.7, 8, 30),
-		Vector3.new(-33.7, 8, 60),
-		Vector3.new(33.7, 8, 60),
-		Vector3.new(-33.7, 8, 76),
-		Vector3.new(33.7, 8, 76),
-	}) do
-		addCornerLight(map, position, Color3.fromRGB(91, 120, 255))
-	end
-end
-
-local function buildLaboratoryDetails(map)
-	local cyan = Color3.fromRGB(70, 225, 218)
-	local violet = Color3.fromRGB(153, 92, 255)
-
-	for index, zPosition in ipairs({ -60, -42, -24, -6, 12, 30, 48, 66, 78 }) do
-		local beam = createPart(
-			map,
-			"CeilingBeam_" .. tostring(index),
-			Vector3.new(67, 0.8, 1.2),
-			CFrame.new(0, 17.25, zPosition),
-			Color3.fromRGB(52, 58, 82),
-			Enum.Material.Metal
-		)
-		beam.CanCollide = false
-
-		for _, xPosition in ipairs({ -25, 0, 25 }) do
-			local ceilingLight = createPart(
-				map,
-				"CeilingStrip",
-				Vector3.new(8, 0.2, 0.7),
-				CFrame.new(xPosition, 16.78, zPosition),
-				if index % 2 == 0 then violet else cyan,
-				Enum.Material.Neon
-			)
-			ceilingLight.CanCollide = false
-
-			local surfaceLight = Instance.new("SurfaceLight")
-			surfaceLight.Face = Enum.NormalId.Bottom
-			surfaceLight.Angle = 80
-			surfaceLight.Brightness = 1.1
-			surfaceLight.Range = 24
-			surfaceLight.Color = ceilingLight.Color
-			surfaceLight.Shadows = false
-			surfaceLight.Parent = ceilingLight
-		end
-	end
-
-	for index, zPosition in ipairs({ -56, -34, -12, 10, 32, 54, 74 }) do
-		for _, side in ipairs({ -1, 1 }) do
-			local panel = createPart(
-				map,
-				"WallPanel_" .. tostring(index) .. "_" .. tostring(side),
-				Vector3.new(0.35, 9, 10),
-				CFrame.new(side * 33.9, 8, zPosition),
-				Color3.fromRGB(62, 73, 96),
-				Enum.Material.DiamondPlate
-			)
-			panel.CanCollide = false
-
-			local accent = createPart(
-				map,
-				"WallAccent",
-				Vector3.new(0.18, 0.45, 8),
-				CFrame.new(side * 33.68, 10.5, zPosition),
-				if index % 2 == 0 then cyan else violet,
-				Enum.Material.Neon
-			)
-			accent.CanCollide = false
-		end
-	end
-
-	for _, side in ipairs({ -1, 1 }) do
-		for pipeIndex, yPosition in ipairs({ 3.2, 5.1 }) do
-			local pipe = createPart(
-				map,
-				"UtilityPipe_" .. tostring(side) .. "_" .. tostring(pipeIndex),
-				Vector3.new(0.7, 0.7, 140),
-				CFrame.new(side * 32.9, yPosition, 7),
-				if pipeIndex == 1 then Color3.fromRGB(73, 85, 115) else Color3.fromRGB(73, 54, 101),
-				Enum.Material.Metal
-			)
-			pipe.CanCollide = false
-		end
-	end
+-- Chamber decks are functional: RoomGenerator reads ChamberDeck_N to place floor overlays and
+-- validates it, so they stay in code. Architecture and decoration come from the Blender layout.
+local function buildChamberDecks(map)
+	local cyan = Theme.Colors.Cyan
+	local violet = Theme.Colors.Violet
 
 	for roomIndex, centerZ in ipairs({ -45, -4, 37 }) do
 		local deck = createPart(
@@ -277,6 +122,8 @@ local function buildLaboratoryDetails(map)
 				Enum.Material.Neon
 			)
 			lane.CanCollide = false
+			lane.CanTouch = false
+			lane.CanQuery = false
 		end
 		-- Short edge dashes make each chamber readable without implying a puzzle solution.
 		for _, side in ipairs({ -1, 1 }) do
@@ -294,43 +141,6 @@ local function buildLaboratoryDetails(map)
 				dash.CanQuery = false
 			end
 		end
-
-		for _, side in ipairs({ -1, 1 }) do
-			local window = createPart(
-				map,
-				"ObservationWindow",
-				Vector3.new(0.2, 5.5, 8),
-				CFrame.new(side * 33.35, 9, centerZ),
-				Color3.fromRGB(86, 116, 167),
-				Enum.Material.Glass
-			)
-			window.Transparency = 0.5
-			window.CanCollide = false
-		end
-	end
-
-	for _, zPosition in ipairs({ -62, -24, 17, 58, 72 }) do
-		for _, xPosition in ipairs({ -30.5, 30.5 }) do
-			createPart(
-				map,
-				"ChamberArch",
-				Vector3.new(3.5, 17, 2),
-				CFrame.new(xPosition, 8.5, zPosition),
-				Color3.fromRGB(50, 58, 81),
-				Enum.Material.Metal
-			)
-		end
-		local archLight = createPart(
-			map,
-			"ArchLight",
-			Vector3.new(58, 0.35, 0.45),
-			CFrame.new(0, 16.2, zPosition),
-			if zPosition % 2 == 0 then violet else cyan,
-			Enum.Material.Neon
-		)
-		archLight.CanCollide = false
-		archLight.CanTouch = false
-		archLight.CanQuery = false
 	end
 end
 
@@ -406,8 +216,8 @@ function MapBuilder.Build(_signals)
 	map.Name = MAP_NAME
 	map.Parent = workspace
 
-	buildRoomShell(map)
-	buildLaboratoryDetails(map)
+	MapLayoutBuilder.Build(map, ExpeditionLayout)
+	buildChamberDecks(map)
 	buildInstructionBoard(map)
 
 	local spawn = Instance.new("SpawnLocation")

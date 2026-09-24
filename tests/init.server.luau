@@ -5,6 +5,7 @@ local SeedUtil = require(ReplicatedStorage.Shared.SeedUtil)
 local Difficulty = require(ReplicatedStorage.Shared.Difficulty)
 local Config = require(ReplicatedStorage.Shared.Config)
 local PresetOrder = require(ReplicatedStorage.Shared.PresetOrder)
+local MatchSession = require(ReplicatedStorage.Shared.MatchSession)
 local InteractionValidator = require(ServerScriptService.ServerModules.InteractionValidator)
 local ReceiptLedger = require(ServerScriptService.ServerModules.ReceiptLedger)
 local RemoteGuard = require(ServerScriptService.ServerModules.RemoteGuard)
@@ -19,6 +20,7 @@ local RoomGeneratorSpec = require(script:WaitForChild("RoomGenerator.spec"))
 local RoundCompletionValidatorSpec = require(script:WaitForChild("RoundCompletionValidator.spec"))
 local SeedUtilSpec = require(script:WaitForChild("SeedUtil.spec"))
 local EconomyConfigSpec = require(script:WaitForChild("EconomyConfig.spec"))
+local MatchSessionSpec = require(script:WaitForChild("MatchSession.spec"))
 
 local Puzzles = ReplicatedStorage.Shared.Puzzles
 local PuzzleModules = {
@@ -41,11 +43,12 @@ local success, message = pcall(function()
 	RemoteGuardSpec.run(RemoteGuard)
 	RoomGeneratorSpec.run(RoomGenerator)
 	RoundCompletionValidatorSpec.run(RoundCompletionValidator)
+	MatchSessionSpec.run(MatchSession)
 end)
 if not success then
 	error("Quality tests failed: " .. tostring(message))
 end
 
 print(
-	"[QA][Tests] economy config, receipts, extraction security, remote guard, interactions, seeds, puzzles and RoomGenerator passed"
+	"[QA][Tests] economy config, match sessions, receipts, extraction security, remote guard, interactions, seeds, puzzles and RoomGenerator passed"
 )

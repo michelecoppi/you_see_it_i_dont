@@ -3,6 +3,12 @@
   "tree": {
     "$className": "DataModel",
 
+    "ReplicatedFirst": {
+      "TeleportArrival": {
+        "$path": "src/first/TeleportArrival.client.luau"
+      }
+    },
+
     "ReplicatedStorage": {
       "Shared": {
         "$path": "src/shared"

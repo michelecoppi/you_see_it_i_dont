@@ -2,6 +2,8 @@ local Environment = require(script.Parent.Environment)
 
 -- Marketplace identifiers intentionally remain zero until their assets are
 -- created in the corresponding Roblox universe. Keep IDs scoped per profile.
+-- Sessions: 0 means "use this same place". Set MatchPlaceId to a dedicated expedition place of the
+-- same universe (and LobbyPlaceId to the hub place) only if you split the game into two places.
 local Profiles = {
 	[Environment.Names.Studio] = {
 		Telemetry = {
@@ -11,6 +13,10 @@ local Profiles = {
 		Persistence = {
 			DataStoreName = "RealityProfiles_Studio_v1",
 			EnableStudioPersistence = false,
+		},
+		Sessions = {
+			MatchPlaceId = 0,
+			LobbyPlaceId = 0,
 		},
 		Marketplace = {
 			GamePasses = {
@@ -33,6 +39,10 @@ local Profiles = {
 			DataStoreName = "RealityProfiles_PrivateTest_v1",
 			EnableStudioPersistence = false,
 		},
+		Sessions = {
+			MatchPlaceId = 0,
+			LobbyPlaceId = 0,
+		},
 		Marketplace = {
 			GamePasses = {
 				VoidDrone = 0,
@@ -54,6 +64,10 @@ local Profiles = {
 			DataStoreName = "RealityProfiles_SoftLaunch_v1",
 			EnableStudioPersistence = false,
 		},
+		Sessions = {
+			MatchPlaceId = 0,
+			LobbyPlaceId = 0,
+		},
 		Marketplace = {
 			GamePasses = {
 				VoidDrone = 0,
@@ -74,6 +88,10 @@ local Profiles = {
 		Persistence = {
 			DataStoreName = "RealityProfiles_v1",
 			EnableStudioPersistence = false,
+		},
+		Sessions = {
+			MatchPlaceId = 0,
+			LobbyPlaceId = 0,
 		},
 		Marketplace = {
 			GamePasses = {

@@ -13,3 +13,7 @@
 /*.rbxl.lock
 
 sourcemap.json
+
+# Blender helper caches
+__pycache__/
+*.blend1
